@@ -187,12 +187,6 @@ project/
 
 This modular design enables isolated execution and easy reuse of individual steps across other sequencing pipelines.
 
----
-下面是**可直接嵌入你当前 README 的精简 ENCODE 标准段落**，格式、语气、长度都与前面 README 风格一致。
-你可以直接复制进 README 中的 **“ENCODE Standards”** 小节。
-
----
-
 ## 📘 **ENCODE Standards for ChIP-seq and ATAC-seq**
 
 This pipeline follows key ENCODE-style guidelines to ensure high-quality, reproducible, and publication-ready chromatin profiling data. Below is a concise summary of the major ENCODE standards and the tools used to satisfy each requirement.
