@@ -1,0 +1,3 @@
+set_name,bed
+TG_unique_up,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-diffbind/diffbind_output/condition_unique_up.TG.vs.WT.bed
+TG_unique_down,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-diffbind/diffbind_output/condition_unique_down.TG.vs.WT.bed
