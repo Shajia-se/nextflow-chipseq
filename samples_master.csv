@@ -1,0 +1,6 @@
+sample_id,condition,replicate,library_type,fastq_r1,fastq_r2,is_control,control_id,use_for_idr,use_for_diffbind,enabled
+GAR0968,WT,1,chip,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/GAR0968_S40_L006_R1_001.fastq.gz,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/GAR0968_S40_L006_R2_001.fastq.gz,false,SRR7416886,true,true,true
+GAR0979,WT,2,chip,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/GAR0979_S58_L008_R1_001.fastq.gz,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/GAR0979_S58_L008_R2_001.fastq.gz,false,SRR7416886,true,true,true
+GAR1585,TG,1,chip,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/GAR1585_S9_L001_R1_001.fastq.gz,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/GAR1585_S9_L001_R2_001.fastq.gz,false,SRR7416886,true,true,true
+GAR1586,TG,2,chip,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/GAR1586_S10_L001_R1_001.fastq.gz,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/GAR1586_S10_L001_R2_001.fastq.gz,false,SRR7416886,true,true,true
+SRR7416886,CTRL,1,input,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/SRR7416886_1.fastq.gz,/ictstr01/groups/idc/projects/uhlenhaut/jiang/data/tr4_chip/SRR7416886_2.fastq.gz,true,,false,false,true
