@@ -15,6 +15,8 @@ source "$ENV_FILE"
 PROFILE="${PROFILE:-hpc}"
 RESUME_FLAG=""
 [[ "${RESUME:-true}" == "true" ]] && RESUME_FLAG="-resume"
+RUN_ID="${RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
+RESET_OUTPUTS="${RESET_OUTPUTS:-false}"
 
 PIPELINES_ROOT="${PIPELINES_ROOT:-/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines}"
 
@@ -40,101 +42,192 @@ need_dir () {
   [[ -d "$d" ]] || { echo "ERROR: missing directory: $d"; exit 1; }
 }
 
+prepare_module_output () {
+  local module="$1"
+  local outdir="$2"
+  local p="${PIPELINES_ROOT}/${module}/${outdir}"
+  if [[ "${RESET_OUTPUTS}" == "true" && -d "$p" ]]; then
+    local bak="${p}.bak.${RUN_ID}"
+    echo "[INFO] Archiving existing output: ${p} -> ${bak}"
+    mv "$p" "$bak"
+  fi
+}
+
 echo "[INFO] Using env file: ${ENV_FILE}"
 echo "[INFO] Profile: ${PROFILE}"
 echo "[INFO] Pipelines root: ${PIPELINES_ROOT}"
 
-need_dir "$RAW_DATA_DIR"
 need_file "$REFERENCE_FASTA"
 need_file "$GTF"
+SAMPLES_MASTER="${SAMPLES_MASTER:-${PIPELINES_ROOT}/nextflow-chipseq/samples_master.csv}"
+need_file "$SAMPLES_MASTER"
+MASTER_ARGS=(--samples_master "$SAMPLES_MASTER")
 
 # 1) FastQC
+prepare_module_output nf-fastqc fastqc_output
 run_nf nf-fastqc \
-  --fastqc_raw_data "$RAW_DATA_DIR" \
-  --fastqc_pattern "$FASTQ_PATTERN_FASTQC"
+  "${MASTER_ARGS[@]}"
 
 # 2) Fastp
+prepare_module_output nf-fastp fastp_output
 run_nf nf-fastp \
-  --fastqc_raw_data "$RAW_DATA_DIR" \
-  --fastp_pattern "$FASTQ_PATTERN_FASTP"
+  "${MASTER_ARGS[@]}"
 
 # 3) BWA
+prepare_module_output nf-bwa bwa_output
 run_nf nf-bwa \
+  "${MASTER_ARGS[@]}" \
   --bwa_raw_data "${PIPELINES_ROOT}/nf-fastp/fastp_output" \
   --reference_fasta "$REFERENCE_FASTA"
 
 # 4) Picard
+prepare_module_output nf-picard picard_output
 run_nf nf-picard \
+  "${MASTER_ARGS[@]}" \
   --bwa_output "${PIPELINES_ROOT}/nf-bwa/bwa_output"
 
 # 5) ChipFilter
+prepare_module_output nf-chipfilter chipfilter_output
 run_nf nf-chipfilter \
+  "${MASTER_ARGS[@]}" \
   --chipfilter_raw_bam "${PIPELINES_ROOT}/nf-picard/picard_output"
 
-# 6) MACS3 (requires sample sheet)
-need_file "$MACS3_SAMPLESHEET"
-run_nf nf-macs3 \
-  --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
-  --macs3_samplesheet "$MACS3_SAMPLESHEET"
+# 6) MACS3 (auto from samples_master; optional explicit sheet override)
+prepare_module_output nf-macs3 macs3_output
+if [[ -n "${MACS3_SAMPLESHEET:-}" && -f "${MACS3_SAMPLESHEET}" ]]; then
+  run_nf nf-macs3 \
+    "${MASTER_ARGS[@]}" \
+    --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
+    --macs3_samplesheet "$MACS3_SAMPLESHEET"
+else
+  run_nf nf-macs3 \
+    "${MASTER_ARGS[@]}" \
+    --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output"
+fi
 
-# 7) IDR (requires pairs csv)
-need_file "$IDR_PAIRS_CSV"
-run_nf nf-idr \
-  --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output" \
-  --idr_pairs_csv "$IDR_PAIRS_CSV"
+# 7) IDR (explicit pairs CSV or auto from samples_master)
+prepare_module_output nf-idr idr_output
+if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
+  run_nf nf-idr \
+    "${MASTER_ARGS[@]}" \
+    --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output" \
+    --idr_pairs_csv "$IDR_PAIRS_CSV"
+else
+  run_nf nf-idr \
+    "${MASTER_ARGS[@]}" \
+    --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output"
+fi
 
 # 8) ChIPseeker
-run_nf nf-chipseeker \
-  --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-  --gtf "$GTF"
+prepare_module_output nf-chipseeker chipseeker_output
+if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
+  run_nf nf-chipseeker \
+    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+    --idr_pairs_csv "$IDR_PAIRS_CSV" \
+    --gtf "$GTF"
+else
+  run_nf nf-chipseeker \
+    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+    --gtf "$GTF"
+fi
 
-# 9) FRiP (requires sample sheet)
-need_file "$FRIP_SAMPLESHEET"
-run_nf nf-frip \
-  --frip_samplesheet "$FRIP_SAMPLESHEET"
+# 9) FRiP (explicit sheet or auto from samples_master)
+prepare_module_output nf-frip frip_output
+if [[ -n "${FRIP_SAMPLESHEET:-}" && -f "${FRIP_SAMPLESHEET}" ]]; then
+  run_nf nf-frip \
+    "${MASTER_ARGS[@]}" \
+    --frip_samplesheet "$FRIP_SAMPLESHEET"
+else
+  run_nf nf-frip \
+    "${MASTER_ARGS[@]}" \
+    --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
+    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output"
+fi
 
 # 10) bamCoverage
+prepare_module_output nf-bamcoverage bamcoverage_output
 run_nf nf-bamcoverage \
+  "${MASTER_ARGS[@]}" \
+  --bam_input_dir "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
   --bam_pattern "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output/*.clean.bam"
 
 # 11) deepTools heatmap (optional)
 if [[ "${RUN_DEEPTOOLS_HEATMAP:-true}" == "true" ]]; then
-  need_file "$DEEPTOOLS_REGIONS_SHEET"
-  run_nf nf-deeptools-heatmap \
-    --regions_sheet "$DEEPTOOLS_REGIONS_SHEET"
+  prepare_module_output nf-deeptools-heatmap deeptools_heatmap_output
+  if [[ -n "${DEEPTOOLS_REGIONS_SHEET:-}" && -f "${DEEPTOOLS_REGIONS_SHEET}" ]]; then
+    run_nf nf-deeptools-heatmap \
+      "${MASTER_ARGS[@]}" \
+      --bigwig_input_dir "${PIPELINES_ROOT}/nf-bamcoverage/bamcoverage_output/bigwig" \
+      --regions_sheet "$DEEPTOOLS_REGIONS_SHEET"
+else
+    run_nf nf-deeptools-heatmap \
+      "${MASTER_ARGS[@]}" \
+      --bigwig_input_dir "${PIPELINES_ROOT}/nf-bamcoverage/bamcoverage_output/bigwig" \
+      --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output"
+  fi
 else
   echo "[INFO] Skip nf-deeptools-heatmap"
 fi
 
-# 12) HOMER motif compare (optional)
-if [[ "${RUN_HOMER_MOTIF_COMPARE:-true}" == "true" ]]; then
-  need_file "$HOMER_MOTIF_COMPARE_SHEET"
-  run_nf nf-homer \
-    --mode motif_compare \
-    --motif_compare_sheet "$HOMER_MOTIF_COMPARE_SHEET"
-else
-  echo "[INFO] Skip nf-homer motif_compare"
-fi
-
-# 13) DiffBind (optional)
+# 12) DiffBind (optional)
 if [[ "${RUN_DIFFBIND:-true}" == "true" ]]; then
-  need_file "$DIFFBIND_SAMPLESHEET"
-  run_nf nf-diffbind \
-    --samplesheet "$DIFFBIND_SAMPLESHEET"
+  prepare_module_output nf-diffbind diffbind_output
+  if [[ -n "${DIFFBIND_SAMPLESHEET:-}" && -f "${DIFFBIND_SAMPLESHEET}" ]]; then
+    run_nf nf-diffbind \
+      --samplesheet "$DIFFBIND_SAMPLESHEET"
+else
+    run_nf nf-diffbind \
+      "${MASTER_ARGS[@]}" \
+      --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
+      --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output"
+  fi
 else
   echo "[INFO] Skip nf-diffbind"
 fi
 
-# 14) Result delivery (optional)
-if [[ "${RUN_RESULT_DELIVERY:-true}" == "true" ]]; then
-  if [[ -n "${DELIVERY_TAG:-}" ]]; then
-    run_nf nf-result-delivery \
-      --delivery_tag "$DELIVERY_TAG"
-  else
-    run_nf nf-result-delivery
+# 13) HOMER motif + motif_compare (optional; default mode is motif_and_compare)
+if [[ "${RUN_HOMER_MOTIF_COMPARE:-true}" == "true" ]]; then
+  prepare_module_output nf-homer homer_output
+  if [[ -n "${HOMER_MOTIF_COMPARE_SHEET:-}" && -f "${HOMER_MOTIF_COMPARE_SHEET}" ]]; then
+    run_nf nf-homer \
+      "${MASTER_ARGS[@]}" \
+      --idr_pairs_csv "${IDR_PAIRS_CSV:-}" \
+      --mode motif_and_compare \
+      --motif_compare_sheet "$HOMER_MOTIF_COMPARE_SHEET"
+else
+    run_nf nf-homer \
+      "${MASTER_ARGS[@]}" \
+      --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output"
   fi
 else
+  echo "[INFO] Skip nf-homer motif/motif_compare"
+fi
+
+# 14) Result delivery (optional)
+if [[ "${RUN_RESULT_DELIVERY:-true}" == "true" ]]; then
+  prepare_module_output nf-result-delivery result_delivery_output
+  DELIVERY_ARGS=()
+  [[ -n "${DELIVERY_TAG:-}" ]] && DELIVERY_ARGS+=(--delivery_tag "$DELIVERY_TAG")
+  [[ -n "${DELIVERY_LEVEL:-}" ]] && DELIVERY_ARGS+=(--delivery_level "$DELIVERY_LEVEL")
+  run_nf nf-result-delivery "${DELIVERY_ARGS[@]}"
+else
   echo "[INFO] Skip nf-result-delivery"
+fi
+
+# 15) MultiQC summary (optional)
+if [[ "${RUN_MULTIQC:-true}" == "true" ]]; then
+  prepare_module_output nf-multiqc multiqc_output
+  MULTIQC_ARGS=()
+  [[ -n "${MULTIQC_TITLE:-}" ]] && MULTIQC_ARGS+=(--multiqc_title "$MULTIQC_TITLE")
+  [[ -n "${MULTIQC_REPORT_NAME:-}" ]] && MULTIQC_ARGS+=(--multiqc_report_name "$MULTIQC_REPORT_NAME")
+  [[ -n "${MULTIQC_EXTRA_PATHS:-}" ]] && MULTIQC_ARGS+=(--multiqc_extra_paths "$MULTIQC_EXTRA_PATHS")
+  [[ -n "${MULTIQC_CONFIG:-}" ]] && MULTIQC_ARGS+=(--multiqc_config "$MULTIQC_CONFIG")
+
+  run_nf nf-multiqc \
+    --pipelines_root "${PIPELINES_ROOT}" \
+    "${MULTIQC_ARGS[@]}"
+else
+  echo "[INFO] Skip nf-multiqc"
 fi
 
 echo

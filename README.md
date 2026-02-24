@@ -15,9 +15,10 @@ It orchestrates these modules in order:
 9. `nf-frip`
 10. `nf-bamcoverage`
 11. `nf-deeptools-heatmap` (optional)
-12. `nf-homer --mode motif_compare` (optional)
-13. `nf-diffbind` (optional)
+12. `nf-diffbind` (optional)
+13. `nf-homer` (optional)
 14. `nf-result-delivery` (optional)
+15. `nf-multiqc` (optional)
 
 ## For Non-coders: Quick Start
 
@@ -31,10 +32,11 @@ cp pipeline.env.example pipeline.env
 2. In `pipeline.env`, set these first:
 
 - `PIPELINES_ROOT`
-- `RAW_DATA_DIR`
+- `SAMPLES_MASTER`
 - `REFERENCE_FASTA`
 - `GTF`
-- sheet file paths (`MACS3_SAMPLESHEET`, `IDR_PAIRS_CSV`, `DIFFBIND_SAMPLESHEET`, `FRIP_SAMPLESHEET`, `DEEPTOOLS_REGIONS_SHEET`, `HOMER_MOTIF_COMPARE_SHEET`)
+
+By default, downstream sheets are auto-generated from `SAMPLES_MASTER`. Keep optional sheet vars empty unless you intentionally want manual override.
 
 3. Run everything:
 
@@ -42,19 +44,11 @@ cp pipeline.env.example pipeline.env
 bash run_end2end.sh pipeline.env
 ```
 
-## Required Sheet Templates
+## Samples Master Guide
 
-Templates are under `templates/`:
+Detailed field-by-field guidance is here:
 
-- `idr_pairs.example.csv`
-- `frip_samplesheet.example.csv`
-- `deeptools_regions_sheet.example.csv`
-- `motif_compare_sheet.example.csv`
-
-Use your existing module sheets for:
-
-- MACS3: `nf-macs3/macs3_samplesheet.csv`
-- DiffBind: `nf-diffbind/samplesheet.csv`
+- `docs/SAMPLES_MASTER_GUIDE.md`
 
 ## Notes
 

@@ -2,8 +2,6 @@
 
 This guide explains exactly how to fill `samples_master.csv` for the end-to-end ChIP-seq pipeline.
 
-Audience: users with little or no coding experience.
-
 ---
 
 ## 1. Purpose
@@ -39,6 +37,26 @@ Header must be exactly:
 ```csv
 sample_id,condition,replicate,library_type,fastq_r1,fastq_r2,is_control,control_id,use_for_idr,use_for_diffbind,enabled
 ```
+
+## 3.1 Field Defaults and Module Usage
+
+| Column | Recommended default | Used by modules |
+|---|---|---|
+| `sample_id` | no default (required, unique) | fastp, bwa, picard, chipfilter, macs3, idr, frip, bamcoverage, deeptools, diffbind |
+| `condition` | no default (required for chip rows) | idr, frip, deeptools, diffbind, homer |
+| `replicate` | integer (`1`, `2`, ...) | idr (auto pairing), diffbind |
+| `library_type` | `chip` for IP, `input` for control | idr, diffbind |
+| `fastq_r1` | no default (required) | fastqc, fastp |
+| `fastq_r2` | no default (required for PE) | fastqc, fastp |
+| `is_control` | `false` for chip, `true` for input | macs3, idr, frip, bamcoverage, deeptools, diffbind, homer |
+| `control_id` | chip row: input `sample_id`; input row: empty | macs3 |
+| `use_for_idr` | chip `true`, input `false` | idr |
+| `use_for_diffbind` | chip `true`, input `false` | diffbind |
+| `enabled` | `true` | almost all auto modes (sample filtering) |
+
+Notes:
+- `enabled` empty is treated as `true` in most modules.
+- `library_type` empty is treated as `chip` in some modules; do not rely on this, fill it explicitly.
 
 ### Column-by-column instructions
 
@@ -158,6 +176,31 @@ Before running the pipeline, verify:
 - Every `chip` row has a valid `control_id`
 - At least 2 `chip` replicates per ChIP condition for robust IDR/DiffBind
 - `enabled=true` for all rows you want to run
+
+---
+
+## 6.1 Module-by-Module Minimal Field Requirements
+
+- `nf-fastqc` (auto mode): `fastq_r1`, `fastq_r2`, optional `enabled`
+- `nf-fastp` (auto mode): `sample_id`, `fastq_r1`, `fastq_r2`, optional `enabled`
+- `nf-bwa` (auto mode): `sample_id`, optional `enabled` (reads trimmed FASTQ from fastp output)
+- `nf-picard` / `nf-chipfilter`: `sample_id`, optional `enabled` (filters BAMs from upstream output)
+- `nf-macs3` (auto mode): `sample_id`, `is_control`, `control_id`, optional `library_type`, `enabled`
+- `nf-idr` (auto mode): `sample_id`, `condition`, optional `replicate`, `library_type`, `is_control`, `use_for_idr`, `enabled`
+- `nf-frip` (auto mode): `sample_id`, `condition`, optional `is_control`, `enabled`
+- `nf-bamcoverage` (auto mode): `sample_id`, optional `is_control`, `enabled`
+- `nf-deeptools-heatmap` (auto mode): `sample_id`, `condition`, optional `is_control`, `enabled`
+- `nf-diffbind` (auto mode): `sample_id`, `condition`, optional `replicate`, `library_type`, `is_control`, `use_for_diffbind`, `enabled`
+- `nf-homer` motif_compare auto: `condition`, optional `is_control`, `enabled`
+
+---
+
+## 6.2 Recommended Constraints for Reliable Runs
+
+- Use one `sample_id` per biological library (no duplicates).
+- Keep only one input control sample if all chip samples share one control; otherwise ensure each chip row has correct `control_id`.
+- For IDR and DiffBind, keep at least 2 chip replicates per condition.
+- If a sample should be excluded globally, set `enabled=false` (instead of deleting the row).
 
 ---
 
