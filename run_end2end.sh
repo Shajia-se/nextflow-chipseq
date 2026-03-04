@@ -20,6 +20,11 @@ RESET_OUTPUTS="${RESET_OUTPUTS:-false}"
 
 PIPELINES_ROOT="${PIPELINES_ROOT:-/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines}"
 
+join_by_comma () {
+  local IFS=','
+  echo "$*"
+}
+
 run_nf () {
   local module="$1"
   shift
@@ -62,6 +67,23 @@ need_file "$GTF"
 SAMPLES_MASTER="${SAMPLES_MASTER:-${PIPELINES_ROOT}/nextflow-chipseq/samples_master.csv}"
 need_file "$SAMPLES_MASTER"
 MASTER_ARGS=(--samples_master "$SAMPLES_MASTER")
+
+FRIP_SOURCES_DEFAULT=()
+[[ "${RUN_IDR:-true}" == "true" ]] && FRIP_SOURCES_DEFAULT+=("idr")
+[[ "${RUN_PEAK_CONSENSUS:-true}" == "true" ]] && FRIP_SOURCES_DEFAULT+=("consensus")
+FRIP_PEAK_SOURCES="${FRIP_PEAK_SOURCES:-$(join_by_comma "${FRIP_SOURCES_DEFAULT[@]}")}"
+
+CHIPSEEKER_SOURCES_DEFAULT=()
+[[ "${RUN_IDR:-true}" == "true" ]] && CHIPSEEKER_SOURCES_DEFAULT+=("idr")
+[[ "${RUN_PEAK_CONSENSUS:-true}" == "true" ]] && CHIPSEEKER_SOURCES_DEFAULT+=("consensus")
+[[ "${RUN_DIFFBIND:-true}" == "true" ]] && CHIPSEEKER_SOURCES_DEFAULT+=("diffbind")
+CHIPSEEKER_PEAK_SOURCES="${CHIPSEEKER_PEAK_SOURCES:-$(join_by_comma "${CHIPSEEKER_SOURCES_DEFAULT[@]}")}"
+
+HOMER_SOURCES_DEFAULT=()
+[[ "${RUN_IDR:-true}" == "true" ]] && HOMER_SOURCES_DEFAULT+=("idr")
+[[ "${RUN_PEAK_CONSENSUS:-true}" == "true" ]] && HOMER_SOURCES_DEFAULT+=("consensus")
+[[ "${RUN_DIFFBIND:-true}" == "true" ]] && HOMER_SOURCES_DEFAULT+=("diffbind")
+HOMER_PEAK_SOURCES="${HOMER_PEAK_SOURCES:-$(join_by_comma "${HOMER_SOURCES_DEFAULT[@]}")}"
 
 # 1) FastQC
 prepare_module_output nf-fastqc fastqc_output
@@ -140,17 +162,22 @@ else
 fi
 
 # 9) FRiP (explicit sheet or auto from samples_master; default peak sets: idr + consensus)
-prepare_module_output nf-frip frip_output
-if [[ -n "${FRIP_SAMPLESHEET:-}" && -f "${FRIP_SAMPLESHEET}" ]]; then
-  run_nf nf-frip \
-    "${MASTER_ARGS[@]}" \
-    --frip_samplesheet "$FRIP_SAMPLESHEET"
+if [[ -n "${FRIP_PEAK_SOURCES}" ]]; then
+  prepare_module_output nf-frip frip_output
+  if [[ -n "${FRIP_SAMPLESHEET:-}" && -f "${FRIP_SAMPLESHEET}" ]]; then
+    run_nf nf-frip \
+      "${MASTER_ARGS[@]}" \
+      --frip_samplesheet "$FRIP_SAMPLESHEET"
+  else
+    run_nf nf-frip \
+      "${MASTER_ARGS[@]}" \
+      --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
+      --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+      --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
+      --frip_peak_sources "${FRIP_PEAK_SOURCES}"
+  fi
 else
-  run_nf nf-frip \
-    "${MASTER_ARGS[@]}" \
-    --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
-    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-    --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output"
+  echo "[INFO] Skip nf-frip (no enabled peak sources)"
 fi
 
 # 10) bamCoverage
@@ -177,35 +204,52 @@ else
 fi
 
 # 12) ChIPseeker (default peak sets: idr + consensus + diffbind)
-prepare_module_output nf-chipseeker chipseeker_output
-if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
-  run_nf nf-chipseeker \
-    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-    --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
-    --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
-    --idr_pairs_csv "$IDR_PAIRS_CSV" \
-    --gtf "$GTF"
+if [[ -n "${CHIPSEEKER_PEAK_SOURCES}" ]]; then
+  prepare_module_output nf-chipseeker chipseeker_output
+  if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
+    run_nf nf-chipseeker \
+      --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+      --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
+      --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+      --chipseeker_peak_sources "${CHIPSEEKER_PEAK_SOURCES}" \
+      --idr_pairs_csv "$IDR_PAIRS_CSV" \
+      --gtf "$GTF"
+  else
+    run_nf nf-chipseeker \
+      --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+      --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
+      --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+      --chipseeker_peak_sources "${CHIPSEEKER_PEAK_SOURCES}" \
+      --gtf "$GTF"
+  fi
 else
-  run_nf nf-chipseeker \
-    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-    --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
-    --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
-    --gtf "$GTF"
+  echo "[INFO] Skip nf-chipseeker (no enabled peak sources)"
 fi
 
 # 13) HOMER motif + motif_compare (optional; default motif sources: idr + consensus + diffbind)
 if [[ "${RUN_HOMER_MOTIF_COMPARE:-true}" == "true" ]]; then
-  prepare_module_output nf-homer homer_output
-  if [[ -n "${HOMER_MOTIF_COMPARE_SHEET:-}" && -f "${HOMER_MOTIF_COMPARE_SHEET}" ]]; then
-    run_nf nf-homer \
-      "${MASTER_ARGS[@]}" \
-      --idr_pairs_csv "${IDR_PAIRS_CSV:-}" \
-      --mode motif_and_compare \
-      --motif_compare_sheet "$HOMER_MOTIF_COMPARE_SHEET"
-else
-    run_nf nf-homer \
-      "${MASTER_ARGS[@]}" \
-      --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output"
+  if [[ -n "${HOMER_PEAK_SOURCES}" ]]; then
+    prepare_module_output nf-homer homer_output
+    if [[ -n "${HOMER_MOTIF_COMPARE_SHEET:-}" && -f "${HOMER_MOTIF_COMPARE_SHEET}" ]]; then
+      run_nf nf-homer \
+        "${MASTER_ARGS[@]}" \
+        --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+        --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
+        --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+        --homer_peak_sources "${HOMER_PEAK_SOURCES}" \
+        --idr_pairs_csv "${IDR_PAIRS_CSV:-}" \
+        --mode motif_and_compare \
+        --motif_compare_sheet "$HOMER_MOTIF_COMPARE_SHEET"
+    else
+      run_nf nf-homer \
+        "${MASTER_ARGS[@]}" \
+        --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+        --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
+        --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+        --homer_peak_sources "${HOMER_PEAK_SOURCES}"
+    fi
+  else
+    echo "[INFO] Skip nf-homer motif/motif_compare (no enabled peak sources)"
   fi
 else
   echo "[INFO] Skip nf-homer motif/motif_compare"
