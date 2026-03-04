@@ -92,7 +92,10 @@ run_nf nf-chipfilter \
   "${MASTER_ARGS[@]}" \
   --chipfilter_raw_bam "${PIPELINES_ROOT}/nf-picard/picard_output"
 
-# 6) MACS3 (auto from samples_master; optional explicit sheet override)
+# 6) MACS3
+#    default output branches:
+#    - idr_q0.1
+#    - strict_q0.01
 prepare_module_output nf-macs3 macs3_output
 if [[ -n "${MACS3_SAMPLESHEET:-}" && -f "${MACS3_SAMPLESHEET}" ]]; then
   run_nf nf-macs3 \
@@ -105,33 +108,38 @@ else
     --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output"
 fi
 
-# 7) IDR (explicit pairs CSV or auto from samples_master)
-prepare_module_output nf-idr idr_output
-if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
-  run_nf nf-idr \
-    "${MASTER_ARGS[@]}" \
-    --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output" \
-    --idr_pairs_csv "$IDR_PAIRS_CSV"
+# 7) IDR (optional; default MACS3 profile: idr_q0.1)
+if [[ "${RUN_IDR:-true}" == "true" ]]; then
+  prepare_module_output nf-idr idr_output
+  if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
+    run_nf nf-idr \
+      "${MASTER_ARGS[@]}" \
+      --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output" \
+      --idr_pairs_csv "$IDR_PAIRS_CSV"
+  else
+    run_nf nf-idr \
+      "${MASTER_ARGS[@]}" \
+      --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output"
+  fi
 else
-  run_nf nf-idr \
-    "${MASTER_ARGS[@]}" \
-    --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output"
+  echo "[INFO] Skip nf-idr"
 fi
 
-# 8) ChIPseeker
-prepare_module_output nf-chipseeker chipseeker_output
-if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
-  run_nf nf-chipseeker \
-    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-    --idr_pairs_csv "$IDR_PAIRS_CSV" \
-    --gtf "$GTF"
+# 8) Peak consensus (optional; default MACS3 profile: strict_q0.01)
+if [[ "${RUN_PEAK_CONSENSUS:-true}" == "true" ]]; then
+  prepare_module_output nf-peak-consensus peak_consensus_output
+  if [[ -n "${CONSENSUS_PAIRS_CSV:-}" && -f "${CONSENSUS_PAIRS_CSV}" ]]; then
+    run_nf nf-peak-consensus \
+      --consensus_pairs_csv "$CONSENSUS_PAIRS_CSV"
+  else
+    run_nf nf-peak-consensus \
+      "${MASTER_ARGS[@]}"
+  fi
 else
-  run_nf nf-chipseeker \
-    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-    --gtf "$GTF"
+  echo "[INFO] Skip nf-peak-consensus"
 fi
 
-# 9) FRiP (explicit sheet or auto from samples_master)
+# 9) FRiP (explicit sheet or auto from samples_master; default peak sets: idr + consensus)
 prepare_module_output nf-frip frip_output
 if [[ -n "${FRIP_SAMPLESHEET:-}" && -f "${FRIP_SAMPLESHEET}" ]]; then
   run_nf nf-frip \
@@ -141,7 +149,8 @@ else
   run_nf nf-frip \
     "${MASTER_ARGS[@]}" \
     --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
-    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output"
+    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+    --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output"
 fi
 
 # 10) bamCoverage
@@ -151,25 +160,7 @@ run_nf nf-bamcoverage \
   --bam_input_dir "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
   --bam_pattern "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output/*.clean.bam"
 
-# 11) deepTools heatmap (optional)
-if [[ "${RUN_DEEPTOOLS_HEATMAP:-true}" == "true" ]]; then
-  prepare_module_output nf-deeptools-heatmap deeptools_heatmap_output
-  if [[ -n "${DEEPTOOLS_REGIONS_SHEET:-}" && -f "${DEEPTOOLS_REGIONS_SHEET}" ]]; then
-    run_nf nf-deeptools-heatmap \
-      "${MASTER_ARGS[@]}" \
-      --bigwig_input_dir "${PIPELINES_ROOT}/nf-bamcoverage/bamcoverage_output/bigwig" \
-      --regions_sheet "$DEEPTOOLS_REGIONS_SHEET"
-else
-    run_nf nf-deeptools-heatmap \
-      "${MASTER_ARGS[@]}" \
-      --bigwig_input_dir "${PIPELINES_ROOT}/nf-bamcoverage/bamcoverage_output/bigwig" \
-      --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output"
-  fi
-else
-  echo "[INFO] Skip nf-deeptools-heatmap"
-fi
-
-# 12) DiffBind (optional)
+# 11) DiffBind (optional; default MACS3 profile: strict_q0.01)
 if [[ "${RUN_DIFFBIND:-true}" == "true" ]]; then
   prepare_module_output nf-diffbind diffbind_output
   if [[ -n "${DIFFBIND_SAMPLESHEET:-}" && -f "${DIFFBIND_SAMPLESHEET}" ]]; then
@@ -185,7 +176,24 @@ else
   echo "[INFO] Skip nf-diffbind"
 fi
 
-# 13) HOMER motif + motif_compare (optional; default mode is motif_and_compare)
+# 12) ChIPseeker (default peak sets: idr + consensus + diffbind)
+prepare_module_output nf-chipseeker chipseeker_output
+if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
+  run_nf nf-chipseeker \
+    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+    --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
+    --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+    --idr_pairs_csv "$IDR_PAIRS_CSV" \
+    --gtf "$GTF"
+else
+  run_nf nf-chipseeker \
+    --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
+    --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
+    --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+    --gtf "$GTF"
+fi
+
+# 13) HOMER motif + motif_compare (optional; default motif sources: idr + consensus + diffbind)
 if [[ "${RUN_HOMER_MOTIF_COMPARE:-true}" == "true" ]]; then
   prepare_module_output nf-homer homer_output
   if [[ -n "${HOMER_MOTIF_COMPARE_SHEET:-}" && -f "${HOMER_MOTIF_COMPARE_SHEET}" ]]; then
@@ -203,7 +211,19 @@ else
   echo "[INFO] Skip nf-homer motif/motif_compare"
 fi
 
-# 14) Result delivery (optional)
+# 14) deepTools heatmap (optional; scaled BAM -> mean tracks -> DiffBind gain/loss heatmap)
+if [[ "${RUN_DEEPTOOLS_HEATMAP:-true}" == "true" ]]; then
+  prepare_module_output nf-deeptools-heatmap deeptools_heatmap_output
+  run_nf nf-deeptools-heatmap \
+    "${MASTER_ARGS[@]}" \
+    --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
+    --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output" \
+    --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output"
+else
+  echo "[INFO] Skip nf-deeptools-heatmap"
+fi
+
+# 15) Result delivery (optional)
 if [[ "${RUN_RESULT_DELIVERY:-true}" == "true" ]]; then
   prepare_module_output nf-result-delivery result_delivery_output
   DELIVERY_ARGS=()
@@ -214,7 +234,7 @@ else
   echo "[INFO] Skip nf-result-delivery"
 fi
 
-# 15) MultiQC summary (optional)
+# 16) MultiQC summary (optional)
 if [[ "${RUN_MULTIQC:-true}" == "true" ]]; then
   prepare_module_output nf-multiqc multiqc_output
   MULTIQC_ARGS=()
