@@ -57,6 +57,8 @@ Detailed field-by-field guidance is here:
 - By default, both peak branches run: `RUN_IDR=true` and `RUN_PEAK_CONSENSUS=true`.
 - `nf-idr` consumes `nf-macs3` profile `idr_q0.1`.
 - `nf-peak-consensus` consumes `nf-macs3` profile `strict_q0.01`.
+- `nf-macs3` now applies peak-level blacklist filtering on both branches by default.
 - `run_end2end.sh` now auto-selects downstream peak sources for `nf-frip`, `nf-chipseeker`, and `nf-homer` based on enabled upstream branches. You can override them with `FRIP_PEAK_SOURCES`, `CHIPSEEKER_PEAK_SOURCES`, and `HOMER_PEAK_SOURCES` in `pipeline.env`.
+- `nf-deeptools-heatmap` current workflow is auto-driven from `samples_master + chipfilter + macs3(strict) + diffbind` (no manual regions/group sheets required).
 - Optional modules can be disabled via toggles in `pipeline.env`.
 - The launcher validates key input paths before starting.
