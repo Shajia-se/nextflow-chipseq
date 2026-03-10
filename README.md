@@ -45,6 +45,19 @@ By default, downstream sheets are auto-generated from `SAMPLES_MASTER`. Keep opt
 bash run_end2end.sh pipeline.env
 ```
 
+4. Continue from a specific module (recommended for testing):
+
+- In `pipeline.env`, set:
+  - `START_FROM=picard` (example)
+  - `RESUME=true`
+  - keep module toggles (`RUN_*=true/false`) as needed
+
+Then run:
+
+```bash
+bash run_end2end_parallel_safe.sh pipeline.env
+```
+
 ## Samples Master Guide
 
 Detailed field-by-field guidance is here:
@@ -61,4 +74,5 @@ Detailed field-by-field guidance is here:
 - `run_end2end.sh` now auto-selects downstream peak sources for `nf-frip`, `nf-chipseeker`, and `nf-homer` based on enabled upstream branches. You can override them with `FRIP_PEAK_SOURCES`, `CHIPSEEKER_PEAK_SOURCES`, and `HOMER_PEAK_SOURCES` in `pipeline.env`.
 - `nf-deeptools-heatmap` current workflow is auto-driven from `samples_master + chipfilter + macs3(strict) + diffbind` (no manual regions/group sheets required).
 - Optional modules can be disabled via toggles in `pipeline.env`.
+- Core modules can also be toggled now (`RUN_FASTQC`, `RUN_FASTP`, `RUN_BWA`, `RUN_PICARD`, `RUN_CHIPFILTER`, `RUN_MACS3`, etc.).
 - The launcher validates key input paths before starting.
