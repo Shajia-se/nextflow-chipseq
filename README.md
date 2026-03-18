@@ -2,7 +2,7 @@
 
 This folder provides a **one-command launcher** to run your modular ChIP-seq workflow end-to-end.
 
-It orchestrates these modules in order:
+It orchestrates these modules in dependency order:
 
 1. `nf-fastqc`
 2. `nf-fastp`
@@ -10,11 +10,11 @@ It orchestrates these modules in order:
 4. `nf-picard`
 5. `nf-chipfilter`
 6. `nf-macs3`
-7. `nf-idr`
-8. `nf-peak-consensus` (optional)
-9. `nf-frip`
+7. `nf-idr` (from `macs3/idr_q0.1`)
+8. `nf-peak-consensus` (optional; from `macs3/strict_q0.01`)
+9. `nf-diffbind` (optional; from `macs3/strict_q0.01`)
 10. `nf-bamcoverage`
-11. `nf-diffbind` (optional)
+11. `nf-frip`
 12. `nf-chipseeker`
 13. `nf-homer` (optional)
 14. `nf-deeptools-heatmap` (optional)
@@ -64,6 +64,24 @@ Detailed field-by-field guidance is here:
 
 - `docs/SAMPLES_MASTER_GUIDE.md`
 
+## Walkthrough Doc Order (recommended)
+
+1. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_00_CURRENT_FLOW.md`
+2. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_01_FASTQC.md`
+3. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_02_FASTP.md`
+4. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_03_BWA.md`
+5. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_04_PICARD.md`
+6. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_05_CHIPFILTER.md`
+7. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_06_MACS3.md`
+8. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_07_IDR.md`
+9. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_07B_PEAK_CONSENSUS.md`
+10. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_12_DIFFBIND.md`
+11. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_09_FRIP.md`
+12. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_10_BAMCOVERAGE.md`
+13. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_08_CHIPSEEKER.md`
+14. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_13_HOMER.md`
+15. `docs/NEXTFLOW_CHIPSEQ_WALKTHROUGH_11_DEEPTOOLS_HEATMAP.md`
+
 ## Notes
 
 - Set `RESUME=true` in `pipeline.env` to resume from previous runs.
@@ -71,6 +89,7 @@ Detailed field-by-field guidance is here:
 - `nf-idr` consumes `nf-macs3` profile `idr_q0.1`.
 - `nf-peak-consensus` consumes `nf-macs3` profile `strict_q0.01`.
 - `nf-macs3` now applies peak-level blacklist filtering on both branches by default.
+- `nf-chipfilter` current default flow does not apply BAM-level blacklist filtering.
 - `run_end2end.sh` now auto-selects downstream peak sources for `nf-frip`, `nf-chipseeker`, and `nf-homer` based on enabled upstream branches. You can override them with `FRIP_PEAK_SOURCES`, `CHIPSEEKER_PEAK_SOURCES`, and `HOMER_PEAK_SOURCES` in `pipeline.env`.
 - `nf-deeptools-heatmap` current workflow is auto-driven from `samples_master + chipfilter + macs3(strict) + diffbind` (no manual regions/group sheets required).
 - Optional modules can be disabled via toggles in `pipeline.env`.
