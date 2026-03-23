@@ -89,8 +89,16 @@ prepare_module_output () {
   local module="$1"
   local outdir="$2"
   local p="${PIPELINES_ROOT}/${module}/${outdir}"
+
+  if [[ "$outdir" == "result_delivery_output" ]]; then
+    echo "[INFO] Keep delivery root as-is: ${p}"
+    return 0
+  fi
+
   if [[ "${RESET_OUTPUTS}" == "true" && -d "$p" ]]; then
-    local bak="${p}.bak.${RUN_ID}"
+    local ts
+    ts="$(date +%Y%m%d_%H%M%S)"
+    local bak="${p}.bak.${ts}"
     echo "[INFO] Archiving existing output: ${p} -> ${bak}"
     mv "$p" "$bak"
   fi
