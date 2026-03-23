@@ -137,18 +137,24 @@ MASTER_ARGS=(--samples_master "$SAMPLES_MASTER")
 
 FRIP_SOURCES_DEFAULT=()
 [[ "${RUN_IDR}" == "true" ]] && FRIP_SOURCES_DEFAULT+=("idr")
-[[ "${RUN_PEAK_CONSENSUS}" == "true" ]] && FRIP_SOURCES_DEFAULT+=("consensus")
+if [[ "${RUN_PEAK_CONSENSUS}" == "true" ]]; then
+  FRIP_SOURCES_DEFAULT+=("consensus_q0.01" "consensus_q0.05")
+fi
 FRIP_PEAK_SOURCES="${FRIP_PEAK_SOURCES:-$(join_by_comma "${FRIP_SOURCES_DEFAULT[@]}")}"
 
 CHIPSEEKER_SOURCES_DEFAULT=()
 [[ "${RUN_IDR}" == "true" ]] && CHIPSEEKER_SOURCES_DEFAULT+=("idr")
-[[ "${RUN_PEAK_CONSENSUS}" == "true" ]] && CHIPSEEKER_SOURCES_DEFAULT+=("consensus")
+if [[ "${RUN_PEAK_CONSENSUS}" == "true" ]]; then
+  CHIPSEEKER_SOURCES_DEFAULT+=("consensus_q0.01" "consensus_q0.05")
+fi
 [[ "${RUN_DIFFBIND}" == "true" ]] && CHIPSEEKER_SOURCES_DEFAULT+=("diffbind")
 CHIPSEEKER_PEAK_SOURCES="${CHIPSEEKER_PEAK_SOURCES:-$(join_by_comma "${CHIPSEEKER_SOURCES_DEFAULT[@]}")}"
 
 HOMER_SOURCES_DEFAULT=()
 [[ "${RUN_IDR}" == "true" ]] && HOMER_SOURCES_DEFAULT+=("idr")
-[[ "${RUN_PEAK_CONSENSUS}" == "true" ]] && HOMER_SOURCES_DEFAULT+=("consensus")
+if [[ "${RUN_PEAK_CONSENSUS}" == "true" ]]; then
+  HOMER_SOURCES_DEFAULT+=("consensus_q0.01" "consensus_q0.05")
+fi
 HOMER_PEAK_SOURCES="${HOMER_PEAK_SOURCES:-$(join_by_comma "${HOMER_SOURCES_DEFAULT[@]}")}"
 
 # 1) FastQC
