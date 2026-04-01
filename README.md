@@ -33,6 +33,7 @@ cp pipeline.env.example pipeline.env
 2. In `pipeline.env`, set these first:
 
 - `PIPELINES_ROOT`
+- `OUTPUT_PROJECT_ROOT`
 - `SAMPLES_MASTER`
 - `REFERENCE_FASTA`
 - `GTF`
@@ -57,6 +58,23 @@ Then run:
 ```bash
 bash run_end2end_parallel_safe.sh pipeline.env
 ```
+
+## Output Layout
+
+Launcher output is now organized under a flat run root:
+
+```bash
+${OUTPUT_PROJECT_ROOT}/${RUN_ID}/
+  fastqc_output/
+  fastp_output/
+  bwa_output/
+  picard_output/
+  chipfilter_output/
+  macs3_output/
+  ...
+```
+
+This keeps each run isolated while preserving familiar module-style folder names.
 
 ## Samples Master Guide
 
@@ -95,3 +113,4 @@ Detailed field-by-field guidance is here:
 - Optional modules can be disabled via toggles in `pipeline.env`.
 - Core modules can also be toggled now (`RUN_FASTQC`, `RUN_FASTP`, `RUN_BWA`, `RUN_PICARD`, `RUN_CHIPFILTER`, `RUN_MACS3`, etc.).
 - The launcher validates key input paths before starting.
+- `OUTPUT_PROJECT_ROOT` defines the project-level destination, and `RUN_ID` creates the per-run subfolder used by all modules.

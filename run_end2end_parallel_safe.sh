@@ -18,6 +18,7 @@ RESUME_FLAG=""
 RUN_ID="${RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
 RESET_OUTPUTS="${RESET_OUTPUTS:-false}"
 PIPELINES_ROOT="${PIPELINES_ROOT:-/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines}"
+OUTPUT_PROJECT_ROOT="${OUTPUT_PROJECT_ROOT:-${PIPELINES_ROOT}/runs/default_project}"
 START_FROM="${START_FROM:-}"
 
 RUN_FASTQC="${RUN_FASTQC:-true}"
@@ -37,8 +38,27 @@ RUN_DEEPTOOLS_HEATMAP="${RUN_DEEPTOOLS_HEATMAP:-true}"
 RUN_RESULT_DELIVERY="${RUN_RESULT_DELIVERY:-true}"
 RUN_MULTIQC="${RUN_MULTIQC:-true}"
 
-LOG_DIR="${ROOT_DIR}/logs"
+ACTIVE_RUN_ROOT="${OUTPUT_PROJECT_ROOT%/}/${RUN_ID}"
+LOG_DIR="${ACTIVE_RUN_ROOT}/logs"
+mkdir -p "${ACTIVE_RUN_ROOT}"
 mkdir -p "$LOG_DIR"
+
+FASTQC_OUT="${ACTIVE_RUN_ROOT}/fastqc_output"
+FASTP_OUT="${ACTIVE_RUN_ROOT}/fastp_output"
+BWA_OUT="${ACTIVE_RUN_ROOT}/bwa_output"
+PICARD_OUT="${ACTIVE_RUN_ROOT}/picard_output"
+CHIPFILTER_OUT="${ACTIVE_RUN_ROOT}/chipfilter_output"
+MACS3_OUT="${ACTIVE_RUN_ROOT}/macs3_output"
+IDR_OUT="${ACTIVE_RUN_ROOT}/idr_output"
+PEAK_CONSENSUS_OUT="${ACTIVE_RUN_ROOT}/peak_consensus_output"
+DIFFBIND_OUT="${ACTIVE_RUN_ROOT}/diffbind_output"
+BAMCOVERAGE_OUT="${ACTIVE_RUN_ROOT}/bamcoverage_output"
+FRIP_OUT="${ACTIVE_RUN_ROOT}/frip_output"
+CHIPSEEKER_OUT="${ACTIVE_RUN_ROOT}/chipseeker_output"
+HOMER_OUT="${ACTIVE_RUN_ROOT}/homer_output"
+DEEPTOOLS_OUT="${ACTIVE_RUN_ROOT}/deeptools_heatmap_output"
+RESULT_DELIVERY_OUT="${ACTIVE_RUN_ROOT}/result_delivery_output"
+MULTIQC_OUT="${ACTIVE_RUN_ROOT}/multiqc_output"
 
 join_by_comma () {
   local IFS=','
@@ -88,7 +108,7 @@ need_file () {
 prepare_module_output () {
   local module="$1"
   local outdir="$2"
-  local p="${PIPELINES_ROOT}/${module}/${outdir}"
+  local p="${ACTIVE_RUN_ROOT}/${outdir}"
 
   if [[ "$outdir" == "result_delivery_output" ]]; then
     echo "[INFO] Keep delivery root as-is: ${p}"
@@ -113,12 +133,12 @@ run_nf () {
   echo
   echo "========== ${module} (sequential) =========="
   echo "cd ${module_dir}"
-  echo "nextflow run main.nf -profile ${PROFILE} $* ${RESUME_FLAG}"
+  echo "nextflow run main.nf -profile ${PROFILE} --project_folder ${ACTIVE_RUN_ROOT} $* ${RESUME_FLAG}"
 
   (
     set -euo pipefail
     cd "$module_dir"
-    nextflow run main.nf -profile "$PROFILE" "$@" ${RESUME_FLAG}
+    nextflow run main.nf -profile "$PROFILE" --project_folder "${ACTIVE_RUN_ROOT}" "$@" ${RESUME_FLAG}
   ) 2>&1 | tee "$log_file"
 }
 
@@ -134,12 +154,12 @@ launch_nf_bg () {
   echo
   echo "========== ${module} (parallel launch) =========="
   echo "cd ${module_dir}"
-  echo "nextflow run main.nf -profile ${PROFILE} $* ${RESUME_FLAG}"
+  echo "nextflow run main.nf -profile ${PROFILE} --project_folder ${ACTIVE_RUN_ROOT} $* ${RESUME_FLAG}"
 
   (
     set -euo pipefail
     cd "$module_dir"
-    nextflow run main.nf -profile "$PROFILE" "$@" ${RESUME_FLAG}
+    nextflow run main.nf -profile "$PROFILE" --project_folder "${ACTIVE_RUN_ROOT}" "$@" ${RESUME_FLAG}
   ) >"$log_file" 2>&1 &
 
   local pid=$!
@@ -179,6 +199,8 @@ wait_wave () {
 echo "[INFO] Using env file: ${ENV_FILE}"
 echo "[INFO] Profile: ${PROFILE}"
 echo "[INFO] Pipelines root: ${PIPELINES_ROOT}"
+echo "[INFO] Output project root: ${OUTPUT_PROJECT_ROOT}"
+echo "[INFO] Active run root: ${ACTIVE_RUN_ROOT}"
 echo "[INFO] Run ID: ${RUN_ID}"
 echo "[INFO] Logs: ${LOG_DIR}"
 [[ -n "${START_FROM}" ]] && echo "[INFO] START_FROM: ${START_FROM}"
@@ -238,7 +260,7 @@ if should_run bwa "${RUN_BWA}"; then
   prepare_module_output nf-bwa bwa_output
   run_nf nf-bwa \
     "${MASTER_ARGS[@]}" \
-    --bwa_raw_data "${PIPELINES_ROOT}/nf-fastp/fastp_output" \
+    --bwa_raw_data "${FASTP_OUT}" \
     --reference_fasta "$REFERENCE_FASTA"
 else
   echo "[INFO] Skip nf-bwa"
@@ -248,7 +270,7 @@ if should_run picard "${RUN_PICARD}"; then
   prepare_module_output nf-picard picard_output
   run_nf nf-picard \
     "${MASTER_ARGS[@]}" \
-    --bwa_output "${PIPELINES_ROOT}/nf-bwa/bwa_output"
+    --bwa_output "${BWA_OUT}"
 else
   echo "[INFO] Skip nf-picard"
 fi
@@ -257,7 +279,7 @@ if should_run chipfilter "${RUN_CHIPFILTER}"; then
   prepare_module_output nf-chipfilter chipfilter_output
   run_nf nf-chipfilter \
     "${MASTER_ARGS[@]}" \
-    --chipfilter_raw_bam "${PIPELINES_ROOT}/nf-picard/picard_output"
+    --chipfilter_raw_bam "${PICARD_OUT}"
 else
   echo "[INFO] Skip nf-chipfilter"
 fi
@@ -267,12 +289,12 @@ if should_run macs3 "${RUN_MACS3}"; then
   if [[ -n "${MACS3_SAMPLESHEET:-}" && -f "${MACS3_SAMPLESHEET}" ]]; then
     run_nf nf-macs3 \
       "${MASTER_ARGS[@]}" \
-      --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
+      --chipfilter_output "${CHIPFILTER_OUT}" \
       --macs3_samplesheet "$MACS3_SAMPLESHEET"
   else
     run_nf nf-macs3 \
       "${MASTER_ARGS[@]}" \
-      --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output"
+      --chipfilter_output "${CHIPFILTER_OUT}"
   fi
 else
   echo "[INFO] Skip nf-macs3"
@@ -286,12 +308,12 @@ if should_run idr "${RUN_IDR}"; then
   if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
     launch_nf_bg nf-idr \
       "${MASTER_ARGS[@]}" \
-      --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output" \
+      --macs3_output "${MACS3_OUT}" \
       --idr_pairs_csv "$IDR_PAIRS_CSV"
   else
     launch_nf_bg nf-idr \
       "${MASTER_ARGS[@]}" \
-      --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output"
+      --macs3_output "${MACS3_OUT}"
   fi
 else
   echo "[INFO] Skip nf-idr"
@@ -302,7 +324,7 @@ if should_run peak_consensus "${RUN_PEAK_CONSENSUS}"; then
   if [[ -n "${CONSENSUS_PAIRS_CSV:-}" && -f "${CONSENSUS_PAIRS_CSV}" ]]; then
     launch_nf_bg nf-peak-consensus --consensus_pairs_csv "$CONSENSUS_PAIRS_CSV"
   else
-    launch_nf_bg nf-peak-consensus "${MASTER_ARGS[@]}"
+    launch_nf_bg nf-peak-consensus "${MASTER_ARGS[@]}" --macs3_output "${MACS3_OUT}"
   fi
 else
   echo "[INFO] Skip nf-peak-consensus"
@@ -315,8 +337,8 @@ if should_run diffbind "${RUN_DIFFBIND}"; then
   else
     launch_nf_bg nf-diffbind \
       "${MASTER_ARGS[@]}" \
-      --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
-      --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output"
+      --chipfilter_output "${CHIPFILTER_OUT}" \
+      --macs3_output "${MACS3_OUT}"
   fi
 else
   echo "[INFO] Skip nf-diffbind"
@@ -326,8 +348,8 @@ if should_run bamcoverage "${RUN_BAMCOVERAGE}"; then
   prepare_module_output nf-bamcoverage bamcoverage_output
   launch_nf_bg nf-bamcoverage \
     "${MASTER_ARGS[@]}" \
-    --bam_input_dir "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
-    --bam_pattern "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output/*.clean.bam"
+    --bam_input_dir "${CHIPFILTER_OUT}" \
+    --bam_pattern "${CHIPFILTER_OUT}/*.clean.bam"
 else
   echo "[INFO] Skip nf-bamcoverage"
 fi
@@ -346,9 +368,9 @@ if should_run frip "${RUN_FRIP}" && [[ -n "${FRIP_PEAK_SOURCES}" ]]; then
   else
     launch_nf_bg nf-frip \
       "${MASTER_ARGS[@]}" \
-      --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
-      --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-      --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
+      --chipfilter_output "${CHIPFILTER_OUT}" \
+      --idr_output "${IDR_OUT}" \
+      --peak_consensus_output "${PEAK_CONSENSUS_OUT}" \
       --frip_peak_sources "${FRIP_PEAK_SOURCES}"
   fi
 else
@@ -359,17 +381,17 @@ if should_run chipseeker "${RUN_CHIPSEEKER}" && [[ -n "${CHIPSEEKER_PEAK_SOURCES
   prepare_module_output nf-chipseeker chipseeker_output
   if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
     launch_nf_bg nf-chipseeker \
-      --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-      --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
-      --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+      --idr_output "${IDR_OUT}" \
+      --peak_consensus_output "${PEAK_CONSENSUS_OUT}" \
+      --diffbind_output "${DIFFBIND_OUT}" \
       --chipseeker_peak_sources "${CHIPSEEKER_PEAK_SOURCES}" \
       --idr_pairs_csv "$IDR_PAIRS_CSV" \
       --gtf "$GTF"
   else
     launch_nf_bg nf-chipseeker \
-      --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-      --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
-      --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+      --idr_output "${IDR_OUT}" \
+      --peak_consensus_output "${PEAK_CONSENSUS_OUT}" \
+      --diffbind_output "${DIFFBIND_OUT}" \
       --chipseeker_peak_sources "${CHIPSEEKER_PEAK_SOURCES}" \
       --gtf "$GTF"
   fi
@@ -383,9 +405,9 @@ if should_run homer "${RUN_HOMER}"; then
     if [[ -n "${HOMER_MOTIF_COMPARE_SHEET:-}" && -f "${HOMER_MOTIF_COMPARE_SHEET}" ]]; then
       launch_nf_bg nf-homer \
         "${MASTER_ARGS[@]}" \
-        --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-        --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
-        --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+        --idr_output "${IDR_OUT}" \
+        --peak_consensus_output "${PEAK_CONSENSUS_OUT}" \
+        --diffbind_output "${DIFFBIND_OUT}" \
         --homer_peak_sources "${HOMER_PEAK_SOURCES}" \
         --idr_pairs_csv "${IDR_PAIRS_CSV:-}" \
         --mode motif_and_compare \
@@ -393,9 +415,9 @@ if should_run homer "${RUN_HOMER}"; then
     else
       launch_nf_bg nf-homer \
         "${MASTER_ARGS[@]}" \
-        --idr_output "${PIPELINES_ROOT}/nf-idr/idr_output" \
-        --peak_consensus_output "${PIPELINES_ROOT}/nf-peak-consensus/peak_consensus_output" \
-        --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output" \
+        --idr_output "${IDR_OUT}" \
+        --peak_consensus_output "${PEAK_CONSENSUS_OUT}" \
+        --diffbind_output "${DIFFBIND_OUT}" \
         --homer_peak_sources "${HOMER_PEAK_SOURCES}"
     fi
   else
@@ -409,9 +431,9 @@ if should_run deeptools "${RUN_DEEPTOOLS_HEATMAP}"; then
   prepare_module_output nf-deeptools-heatmap deeptools_heatmap_output
   launch_nf_bg nf-deeptools-heatmap \
     "${MASTER_ARGS[@]}" \
-    --chipfilter_output "${PIPELINES_ROOT}/nf-chipfilter/chipfilter_output" \
-    --macs3_output "${PIPELINES_ROOT}/nf-macs3/macs3_output" \
-    --diffbind_output "${PIPELINES_ROOT}/nf-diffbind/diffbind_output"
+    --chipfilter_output "${CHIPFILTER_OUT}" \
+    --macs3_output "${MACS3_OUT}" \
+    --diffbind_output "${DIFFBIND_OUT}"
 else
   echo "[INFO] Skip nf-deeptools-heatmap"
 fi
@@ -426,7 +448,23 @@ if should_run result_delivery "${RUN_RESULT_DELIVERY}"; then
   DELIVERY_ARGS=()
   [[ -n "${DELIVERY_TAG:-}" ]] && DELIVERY_ARGS+=(--delivery_tag "$DELIVERY_TAG")
   [[ -n "${DELIVERY_LEVEL:-}" ]] && DELIVERY_ARGS+=(--delivery_level "$DELIVERY_LEVEL")
-  run_nf nf-result-delivery "${DELIVERY_ARGS[@]}"
+  run_nf nf-result-delivery \
+    --samples_master "$SAMPLES_MASTER" \
+    --fastp_out "${FASTP_OUT}" \
+    --bwa_out "${BWA_OUT}" \
+    --picard_out "${PICARD_OUT}" \
+    --chipfilter_out "${CHIPFILTER_OUT}" \
+    --frip_out "${FRIP_OUT}" \
+    --idr_out "${IDR_OUT}" \
+    --peak_consensus_out "${PEAK_CONSENSUS_OUT}" \
+    --macs3_out "${MACS3_OUT}" \
+    --diffbind_out "${DIFFBIND_OUT}" \
+    --deeptools_out "${DEEPTOOLS_OUT}" \
+    --homer_out "${HOMER_OUT}" \
+    --chipseeker_out "${CHIPSEEKER_OUT}" \
+    --bw_out "${BAMCOVERAGE_OUT}/bigwig" \
+    --multiqc_out "${MULTIQC_OUT}" \
+    "${DELIVERY_ARGS[@]}"
 else
   echo "[INFO] Skip nf-result-delivery"
 fi
@@ -440,7 +478,7 @@ if should_run multiqc "${RUN_MULTIQC}"; then
   [[ -n "${MULTIQC_CONFIG:-}" ]] && MULTIQC_ARGS+=(--multiqc_config "$MULTIQC_CONFIG")
 
   run_nf nf-multiqc \
-    --pipelines_root "${PIPELINES_ROOT}" \
+    --flat_output_root "${ACTIVE_RUN_ROOT}" \
     "${MULTIQC_ARGS[@]}"
 else
   echo "[INFO] Skip nf-multiqc"
