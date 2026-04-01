@@ -38,6 +38,16 @@ cp pipeline.env.example pipeline.env
 - `REFERENCE_FASTA`
 - `GTF`
 
+Useful optional run controls:
+
+- `MAPQ_THRESHOLD`
+- `MACS3_QVALUE_IDR`
+- `MACS3_QVALUE_CONSENSUS`
+- `MACS3_QVALUE_STRICT`
+- `MACS3_RUN_IDR_BRANCH`
+- `MACS3_RUN_CONSENSUS_BRANCH`
+- `MACS3_RUN_STRICT_BRANCH`
+
 By default, downstream sheets are auto-generated from `SAMPLES_MASTER`. Keep optional sheet vars empty unless you intentionally want manual override.
 
 3. Run everything:

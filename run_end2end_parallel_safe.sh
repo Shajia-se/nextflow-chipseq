@@ -37,6 +37,19 @@ RUN_HOMER="${RUN_HOMER:-${RUN_HOMER_MOTIF_COMPARE:-true}}"
 RUN_DEEPTOOLS_HEATMAP="${RUN_DEEPTOOLS_HEATMAP:-true}"
 RUN_RESULT_DELIVERY="${RUN_RESULT_DELIVERY:-true}"
 RUN_MULTIQC="${RUN_MULTIQC:-true}"
+MAPQ_THRESHOLD="${MAPQ_THRESHOLD:-24}"
+MACS3_QVALUE_IDR="${MACS3_QVALUE_IDR:-0.1}"
+MACS3_QVALUE_CONSENSUS="${MACS3_QVALUE_CONSENSUS:-0.05}"
+MACS3_QVALUE_STRICT="${MACS3_QVALUE_STRICT:-0.01}"
+MACS3_RUN_CONSENSUS_BRANCH="${MACS3_RUN_CONSENSUS_BRANCH:-true}"
+MACS3_RUN_IDR_BRANCH="${MACS3_RUN_IDR_BRANCH:-${RUN_IDR}}"
+if [[ -z "${MACS3_RUN_STRICT_BRANCH:-}" ]]; then
+  if [[ "${RUN_IDR}" == "true" || "${RUN_PEAK_CONSENSUS}" == "true" || "${RUN_DIFFBIND}" == "true" ]]; then
+    MACS3_RUN_STRICT_BRANCH=true
+  else
+    MACS3_RUN_STRICT_BRANCH=false
+  fi
+fi
 
 ACTIVE_RUN_ROOT="${OUTPUT_PROJECT_ROOT%/}/${RUN_ID}"
 LOG_DIR="${ACTIVE_RUN_ROOT}/logs"
@@ -279,7 +292,8 @@ if should_run chipfilter "${RUN_CHIPFILTER}"; then
   prepare_module_output nf-chipfilter chipfilter_output
   run_nf nf-chipfilter \
     "${MASTER_ARGS[@]}" \
-    --chipfilter_raw_bam "${PICARD_OUT}"
+    --chipfilter_raw_bam "${PICARD_OUT}" \
+    --mapq_threshold "${MAPQ_THRESHOLD}"
 else
   echo "[INFO] Skip nf-chipfilter"
 fi
@@ -290,11 +304,23 @@ if should_run macs3 "${RUN_MACS3}"; then
     run_nf nf-macs3 \
       "${MASTER_ARGS[@]}" \
       --chipfilter_output "${CHIPFILTER_OUT}" \
-      --macs3_samplesheet "$MACS3_SAMPLESHEET"
+      --macs3_samplesheet "$MACS3_SAMPLESHEET" \
+      --idr_qvalue "${MACS3_QVALUE_IDR}" \
+      --consensus_qvalue "${MACS3_QVALUE_CONSENSUS}" \
+      --strict_qvalue "${MACS3_QVALUE_STRICT}" \
+      --run_idr_branch "${MACS3_RUN_IDR_BRANCH}" \
+      --run_consensus_branch "${MACS3_RUN_CONSENSUS_BRANCH}" \
+      --run_strict_branch "${MACS3_RUN_STRICT_BRANCH}"
   else
     run_nf nf-macs3 \
       "${MASTER_ARGS[@]}" \
-      --chipfilter_output "${CHIPFILTER_OUT}"
+      --chipfilter_output "${CHIPFILTER_OUT}" \
+      --idr_qvalue "${MACS3_QVALUE_IDR}" \
+      --consensus_qvalue "${MACS3_QVALUE_CONSENSUS}" \
+      --strict_qvalue "${MACS3_QVALUE_STRICT}" \
+      --run_idr_branch "${MACS3_RUN_IDR_BRANCH}" \
+      --run_consensus_branch "${MACS3_RUN_CONSENSUS_BRANCH}" \
+      --run_strict_branch "${MACS3_RUN_STRICT_BRANCH}"
   fi
 else
   echo "[INFO] Skip nf-macs3"
@@ -464,6 +490,10 @@ if should_run result_delivery "${RUN_RESULT_DELIVERY}"; then
     --chipseeker_out "${CHIPSEEKER_OUT}" \
     --bw_out "${BAMCOVERAGE_OUT}/bigwig" \
     --multiqc_out "${MULTIQC_OUT}" \
+    --mapq_threshold "${MAPQ_THRESHOLD}" \
+    --idr_qvalue "${MACS3_QVALUE_IDR}" \
+    --consensus_qvalue "${MACS3_QVALUE_CONSENSUS}" \
+    --strict_qvalue "${MACS3_QVALUE_STRICT}" \
     "${DELIVERY_ARGS[@]}"
 else
   echo "[INFO] Skip nf-result-delivery"
