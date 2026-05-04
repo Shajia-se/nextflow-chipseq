@@ -423,6 +423,7 @@ if should_run result_delivery "${RUN_RESULT_DELIVERY}"; then
   DELIVERY_ARGS=()
   [[ -n "${DELIVERY_TAG:-}" ]] && DELIVERY_ARGS+=(--delivery_tag "$DELIVERY_TAG")
   [[ -n "${DELIVERY_LEVEL:-}" ]] && DELIVERY_ARGS+=(--delivery_level "$DELIVERY_LEVEL")
+  [[ -n "${SHARED_CONTROL_MANIFEST:-}" ]] && DELIVERY_ARGS+=(--shared_control_manifest "$SHARED_CONTROL_MANIFEST")
   run_nf nf-result-delivery \
     --samples_master "$SAMPLES_MASTER" \
     --fastp_out "${FASTP_OUT}" \
