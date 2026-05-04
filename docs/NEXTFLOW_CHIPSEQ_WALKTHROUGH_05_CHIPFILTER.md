@@ -4,7 +4,7 @@
 
 **Purpose**
 - Post-alignment cleanup before peak calling
-- Remove low-confidence/multi-mapped reads, blacklist-overlapping reads, and mitochondrial reads
+- Remove low-confidence/multi-mapped reads and record mitochondrial burden without writing a second filtered BAM
 
 **Input**
 - From `--chipfilter_raw_bam` (usually `nf-picard/picard_output`)
@@ -15,17 +15,14 @@
 
 **Filtering order**
 1. MAPQ filter (`samtools view -q`)
-2. Blacklist filter (`bedtools intersect -v`) if `blacklist_bed` is set
-3. Mitochondrial removal (`chrM`/`MT`)
+2. Mitochondrial QC from the MAPQ-filtered BAM (`chrM`/`MT`)
 
 **Output**
 - `${sample}.nomulti.bam` + `.bai`
-- `${sample}.noblack.bam` + `.bai` (if blacklist enabled)
-- `${sample}.clean.bam` + `.bai`
+- `${sample}.chipfilter.stats.tsv`
 
 **Key Parameters**
-- `mapq_threshold` (default: `4`)
-- `blacklist_bed`
+- `mapq_threshold` (default: `24`)
 - `prefer_dedup`
 - `samples_master` (optional sample restriction)
 
@@ -42,25 +39,20 @@
 
 ### Priority checks (in order)
 
-1. **Read retention after each stage**
-- Compare read counts from `nomulti`, `noblack`, and `clean`
+1. **Read retention after MAPQ filtering**
+- Compare `nomulti_reads` to the upstream aligned read counts
 - Sudden large drops may indicate too strict settings or problematic sample quality
 
 2. **MAPQ threshold reasonableness**
-- `MAPQ=4` is a permissive, commonly used lower cutoff
+- `MAPQ=24` is the current default in this pipeline
 - Higher cutoffs increase specificity but can reduce depth and sensitivity
 
-3. **Blacklist impact**
-- Some decrease is expected
-- Extremely large decrease suggests data enrichment in problematic regions
-
-4. **Mitochondrial fraction**
+3. **Mitochondrial fraction**
 - mtDNA removal should reduce non-informative reads
 - Very high mtDNA fraction can indicate sample prep/library issues
 
-5. **Cross-sample consistency**
+4. **Cross-sample consistency**
 - Filtering behavior should be comparable across replicates in the same condition
 
 ### Practical interpretation rule
 - Use one consistent filtering policy for all samples in a contrast; avoid per-sample tuning.
-

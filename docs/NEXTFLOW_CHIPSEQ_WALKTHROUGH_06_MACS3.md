@@ -13,7 +13,7 @@
 - Preferred priority:
   1. `--macs3_samplesheet` (`sample_id,treatment_bam,control_bam`)
   2. `--samples_master` (auto-generate treatment/control pairs)
-- BAM source is usually `nf-chipfilter/chipfilter_output/*.clean.bam`
+- BAM source is usually `nf-chipfilter/chipfilter_output/*.nomulti.bam`
 
 **Output (two MACS3 branches)**
 - `idr_q0.1/${sample}_peaks.narrowPeak`
@@ -64,4 +64,3 @@ This setup keeps branch intent clear: IDR gets a broader candidate set, while st
 
 4. **Use branch-appropriate downstreams**
 - Do not feed `strict_q0.01` to IDR by mistake.
-

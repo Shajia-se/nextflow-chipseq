@@ -77,6 +77,6 @@ Focus on:
 
 ## Suggested Talking Point: Why dedup in Picard if chipfilter comes next?
 
-- `nf-chipfilter` focuses on MAPQ/blacklist/mitochondrial filters.
+- `nf-chipfilter` focuses on MAPQ filtering plus mitochondrial burden QC.
 - Duplicate handling is conceptually separate and is best done explicitly here.
 - Keeping `remove_duplicates` configurable preserves flexibility for low-depth or special library scenarios.

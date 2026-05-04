@@ -332,7 +332,7 @@ if should_run bamcoverage "${RUN_BAMCOVERAGE}"; then
   run_nf nf-bamcoverage \
     "${MASTER_ARGS[@]}" \
     --bam_input_dir "${CHIPFILTER_OUT}" \
-    --bam_pattern "${CHIPFILTER_OUT}/*.clean.bam"
+    --bam_pattern "${CHIPFILTER_OUT}/*.nomulti.bam"
 else
   echo "[INFO] Skip nf-bamcoverage"
 fi
