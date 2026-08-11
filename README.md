@@ -18,10 +18,17 @@ It orchestrates these modules in dependency order:
 12. `nf-chipseeker`
 13. `nf-homer` (optional)
 14. `nf-deeptools-heatmap` (optional)
-15. `nf-result-delivery` (optional)
-16. `nf-multiqc` (optional)
+15. `nf-multiqc` (optional)
+16. `nf-result-delivery` (optional)
 
 ## For Non-coders: Quick Start
+
+User-facing documentation:
+
+- `QUICK_START_CN.md`: shortest practical setup guide
+- `MANUAL_CN.md`: detailed user manual with table-filling instructions
+- `QUICK_START_EN.md`: English quick start guide
+- `MANUAL_EN.md`: English detailed user manual
 
 1. Copy and edit config:
 
@@ -37,6 +44,7 @@ cp pipeline.env.example pipeline.env
 - `SAMPLES_MASTER`
 - `REFERENCE_FASTA`
 - `GTF`
+- `HPC_MAIL_USER` (default: `molendo.hpc@gmail.com`)
 
 Useful optional run controls:
 
@@ -47,6 +55,7 @@ Useful optional run controls:
 - `MACS3_RUN_IDR_BRANCH`
 - `MACS3_RUN_CONSENSUS_BRANCH`
 - `MACS3_RUN_STRICT_BRANCH`
+- `MACS3_PEAK_BLACKLIST_BED`
 
 By default, downstream sheets are auto-generated from `SAMPLES_MASTER`. Keep optional sheet vars empty unless you intentionally want manual override.
 
@@ -117,6 +126,7 @@ Detailed field-by-field guidance is here:
 - `nf-idr` consumes `nf-macs3` profile `idr_q0.1`.
 - `nf-peak-consensus` consumes `nf-macs3` profile `strict_q0.01`.
 - `nf-macs3` now applies peak-level blacklist filtering on both branches by default.
+- `HPC_MAIL_USER` is forwarded to each module as `--mail_user` so SLURM notifications can be changed in one place.
 - `nf-chipfilter` current default flow does not apply BAM-level blacklist filtering.
 - `run_end2end.sh` now auto-selects downstream peak sources for `nf-frip`, `nf-chipseeker`, and `nf-homer` based on enabled upstream branches. You can override them with `FRIP_PEAK_SOURCES`, `CHIPSEEKER_PEAK_SOURCES`, and `HOMER_PEAK_SOURCES` in `pipeline.env`.
 - `nf-deeptools-heatmap` current workflow is auto-driven from `samples_master + chipfilter + macs3(strict) + diffbind` (no manual regions/group sheets required).

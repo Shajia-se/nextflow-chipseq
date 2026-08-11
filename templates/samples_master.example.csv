@@ -1,0 +1,6 @@
+sample_id,condition,replicate,library_type,fastq_r1,fastq_r2,is_control,control_id,use_for_idr,use_for_diffbind,enabled
+WT_rep1,WT,1,chip,/path/to/WT_rep1_R1.fastq.gz,/path/to/WT_rep1_R2.fastq.gz,false,Input_1,true,true,true
+WT_rep2,WT,2,chip,/path/to/WT_rep2_R1.fastq.gz,/path/to/WT_rep2_R2.fastq.gz,false,Input_1,true,true,true
+KO_rep1,KO,1,chip,/path/to/KO_rep1_R1.fastq.gz,/path/to/KO_rep1_R2.fastq.gz,false,Input_1,true,true,true
+KO_rep2,KO,2,chip,/path/to/KO_rep2_R1.fastq.gz,/path/to/KO_rep2_R2.fastq.gz,false,Input_1,true,true,true
+Input_1,Input,1,input,/path/to/Input_1_R1.fastq.gz,/path/to/Input_1_R2.fastq.gz,true,,false,false,true

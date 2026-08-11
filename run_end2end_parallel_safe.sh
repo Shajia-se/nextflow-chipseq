@@ -13,11 +13,12 @@ fi
 source "$ENV_FILE"
 
 PROFILE="${PROFILE:-hpc}"
+HPC_MAIL_USER="${HPC_MAIL_USER:-molendo.hpc@gmail.com}"
 RESUME_FLAG=""
 [[ "${RESUME:-true}" == "true" ]] && RESUME_FLAG="-resume"
 RUN_ID="${RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
 RESET_OUTPUTS="${RESET_OUTPUTS:-false}"
-PIPELINES_ROOT="${PIPELINES_ROOT:-/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines}"
+PIPELINES_ROOT="${PIPELINES_ROOT:-$(cd "${ROOT_DIR}/.." && pwd)}"
 OUTPUT_PROJECT_ROOT="${OUTPUT_PROJECT_ROOT:-${PIPELINES_ROOT}/runs/default_project}"
 START_FROM="${START_FROM:-}"
 
@@ -43,12 +44,17 @@ MACS3_QVALUE_CONSENSUS="${MACS3_QVALUE_CONSENSUS:-0.05}"
 MACS3_QVALUE_STRICT="${MACS3_QVALUE_STRICT:-0.01}"
 MACS3_RUN_CONSENSUS_BRANCH="${MACS3_RUN_CONSENSUS_BRANCH:-true}"
 MACS3_RUN_IDR_BRANCH="${MACS3_RUN_IDR_BRANCH:-${RUN_IDR}}"
+MACS3_PEAK_BLACKLIST_BED="${MACS3_PEAK_BLACKLIST_BED:-}"
 if [[ -z "${MACS3_RUN_STRICT_BRANCH:-}" ]]; then
   if [[ "${RUN_IDR}" == "true" || "${RUN_PEAK_CONSENSUS}" == "true" || "${RUN_DIFFBIND}" == "true" ]]; then
     MACS3_RUN_STRICT_BRANCH=true
   else
     MACS3_RUN_STRICT_BRANCH=false
   fi
+fi
+MACS3_BLACKLIST_ARGS=()
+if [[ -n "${MACS3_PEAK_BLACKLIST_BED}" ]]; then
+  MACS3_BLACKLIST_ARGS=(--peak_blacklist_bed "${MACS3_PEAK_BLACKLIST_BED}")
 fi
 
 ACTIVE_RUN_ROOT="${OUTPUT_PROJECT_ROOT%/}/${RUN_ID}"
@@ -94,8 +100,8 @@ module_index () {
     chipseeker) echo 120 ;;
     homer) echo 130 ;;
     deeptools) echo 140 ;;
-    result_delivery) echo 150 ;;
-    multiqc) echo 160 ;;
+    multiqc) echo 150 ;;
+    result_delivery) echo 160 ;;
     *) echo -1 ;;
   esac
 }
@@ -116,6 +122,17 @@ should_run () {
 need_file () {
   local f="$1"
   [[ -f "$f" ]] || { echo "ERROR: missing file: $f"; exit 1; }
+}
+
+need_dir () {
+  local d="$1"
+  [[ -d "$d" ]] || { echo "ERROR: missing directory: $d"; exit 1; }
+}
+
+need_optional_file () {
+  local label="$1"
+  local f="$2"
+  [[ -z "$f" ]] || [[ -f "$f" ]] || { echo "ERROR: ${label} was set but file does not exist: $f"; exit 1; }
 }
 
 prepare_module_output () {
@@ -146,12 +163,13 @@ run_nf () {
   echo
   echo "========== ${module} (sequential) =========="
   echo "cd ${module_dir}"
-  echo "nextflow run main.nf -profile ${PROFILE} --project_folder ${ACTIVE_RUN_ROOT} $* ${RESUME_FLAG}"
+  echo "nextflow run main.nf -profile ${PROFILE} --project_folder ${ACTIVE_RUN_ROOT} --mail_user ${HPC_MAIL_USER} $* ${RESUME_FLAG}"
+  need_dir "$module_dir"
 
   (
     set -euo pipefail
     cd "$module_dir"
-    nextflow run main.nf -profile "$PROFILE" --project_folder "${ACTIVE_RUN_ROOT}" "$@" ${RESUME_FLAG}
+    nextflow run main.nf -profile "$PROFILE" --project_folder "${ACTIVE_RUN_ROOT}" --mail_user "${HPC_MAIL_USER}" "$@" ${RESUME_FLAG}
   ) 2>&1 | tee "$log_file"
 }
 
@@ -167,12 +185,13 @@ launch_nf_bg () {
   echo
   echo "========== ${module} (parallel launch) =========="
   echo "cd ${module_dir}"
-  echo "nextflow run main.nf -profile ${PROFILE} --project_folder ${ACTIVE_RUN_ROOT} $* ${RESUME_FLAG}"
+  echo "nextflow run main.nf -profile ${PROFILE} --project_folder ${ACTIVE_RUN_ROOT} --mail_user ${HPC_MAIL_USER} $* ${RESUME_FLAG}"
+  need_dir "$module_dir"
 
   (
     set -euo pipefail
     cd "$module_dir"
-    nextflow run main.nf -profile "$PROFILE" --project_folder "${ACTIVE_RUN_ROOT}" "$@" ${RESUME_FLAG}
+    nextflow run main.nf -profile "$PROFILE" --project_folder "${ACTIVE_RUN_ROOT}" --mail_user "${HPC_MAIL_USER}" "$@" ${RESUME_FLAG}
   ) >"$log_file" 2>&1 &
 
   local pid=$!
@@ -211,6 +230,7 @@ wait_wave () {
 
 echo "[INFO] Using env file: ${ENV_FILE}"
 echo "[INFO] Profile: ${PROFILE}"
+echo "[INFO] HPC mail user: ${HPC_MAIL_USER}"
 echo "[INFO] Pipelines root: ${PIPELINES_ROOT}"
 echo "[INFO] Output project root: ${OUTPUT_PROJECT_ROOT}"
 echo "[INFO] Active run root: ${ACTIVE_RUN_ROOT}"
@@ -220,7 +240,13 @@ echo "[INFO] Logs: ${LOG_DIR}"
 
 if [[ -n "${START_FROM}" ]] && [[ "$(module_index "${START_FROM}")" -lt 0 ]]; then
   echo "ERROR: invalid START_FROM='${START_FROM}'"
-  echo "Valid values: fastqc,fastp,bwa,picard,chipfilter,macs3,idr,peak_consensus,diffbind,bamcoverage,frip,chipseeker,homer,deeptools,result_delivery,multiqc"
+  echo "Valid values: fastqc,fastp,bwa,picard,chipfilter,macs3,idr,peak_consensus,diffbind,bamcoverage,frip,chipseeker,homer,deeptools,multiqc,result_delivery"
+  exit 1
+fi
+
+if [[ "${RUN_DEEPTOOLS_HEATMAP}" == "true" && "${RUN_DIFFBIND}" != "true" ]]; then
+  echo "ERROR: RUN_DEEPTOOLS_HEATMAP=true requires RUN_DIFFBIND=true in the current launcher."
+  echo "Set RUN_DEEPTOOLS_HEATMAP=false for projects without DiffBind gain/loss BED files."
   exit 1
 fi
 
@@ -229,6 +255,16 @@ need_file "$GTF"
 SAMPLES_MASTER="${SAMPLES_MASTER:-${PIPELINES_ROOT}/nextflow-chipseq/samples_master.csv}"
 need_file "$SAMPLES_MASTER"
 MASTER_ARGS=(--samples_master "$SAMPLES_MASTER")
+
+need_optional_file "MACS3_SAMPLESHEET" "${MACS3_SAMPLESHEET:-}"
+need_optional_file "IDR_PAIRS_CSV" "${IDR_PAIRS_CSV:-}"
+need_optional_file "DIFFBIND_SAMPLESHEET" "${DIFFBIND_SAMPLESHEET:-}"
+need_optional_file "FRIP_SAMPLESHEET" "${FRIP_SAMPLESHEET:-}"
+need_optional_file "HOMER_MOTIF_COMPARE_SHEET" "${HOMER_MOTIF_COMPARE_SHEET:-}"
+need_optional_file "CONSENSUS_PAIRS_CSV" "${CONSENSUS_PAIRS_CSV:-}"
+need_optional_file "MACS3_PEAK_BLACKLIST_BED" "${MACS3_PEAK_BLACKLIST_BED:-}"
+need_optional_file "MULTIQC_CONFIG" "${MULTIQC_CONFIG:-}"
+need_optional_file "SHARED_CONTROL_MANIFEST" "${SHARED_CONTROL_MANIFEST:-}"
 
 FRIP_SOURCES_DEFAULT=()
 [[ "${RUN_IDR}" == "true" ]] && FRIP_SOURCES_DEFAULT+=("idr")
@@ -310,7 +346,8 @@ if should_run macs3 "${RUN_MACS3}"; then
       --strict_qvalue "${MACS3_QVALUE_STRICT}" \
       --run_idr_branch "${MACS3_RUN_IDR_BRANCH}" \
       --run_consensus_branch "${MACS3_RUN_CONSENSUS_BRANCH}" \
-      --run_strict_branch "${MACS3_RUN_STRICT_BRANCH}"
+      --run_strict_branch "${MACS3_RUN_STRICT_BRANCH}" \
+      "${MACS3_BLACKLIST_ARGS[@]}"
   else
     run_nf nf-macs3 \
       "${MASTER_ARGS[@]}" \
@@ -320,7 +357,8 @@ if should_run macs3 "${RUN_MACS3}"; then
       --strict_qvalue "${MACS3_QVALUE_STRICT}" \
       --run_idr_branch "${MACS3_RUN_IDR_BRANCH}" \
       --run_consensus_branch "${MACS3_RUN_CONSENSUS_BRANCH}" \
-      --run_strict_branch "${MACS3_RUN_STRICT_BRANCH}"
+      --run_strict_branch "${MACS3_RUN_STRICT_BRANCH}" \
+      "${MACS3_BLACKLIST_ARGS[@]}"
   fi
 else
   echo "[INFO] Skip nf-macs3"
@@ -469,6 +507,21 @@ wait_wave "WAVE2"
 # ------------------------
 # Wave 3: wrap-up sequence
 # ------------------------
+if should_run multiqc "${RUN_MULTIQC}"; then
+  prepare_module_output nf-multiqc multiqc_output
+  MULTIQC_ARGS=()
+  [[ -n "${MULTIQC_TITLE:-}" ]] && MULTIQC_ARGS+=(--multiqc_title "$MULTIQC_TITLE")
+  [[ -n "${MULTIQC_REPORT_NAME:-}" ]] && MULTIQC_ARGS+=(--multiqc_report_name "$MULTIQC_REPORT_NAME")
+  [[ -n "${MULTIQC_EXTRA_PATHS:-}" ]] && MULTIQC_ARGS+=(--multiqc_extra_paths "$MULTIQC_EXTRA_PATHS")
+  [[ -n "${MULTIQC_CONFIG:-}" ]] && MULTIQC_ARGS+=(--multiqc_config "$MULTIQC_CONFIG")
+
+  run_nf nf-multiqc \
+    --flat_output_root "${ACTIVE_RUN_ROOT}" \
+    "${MULTIQC_ARGS[@]}"
+else
+  echo "[INFO] Skip nf-multiqc"
+fi
+
 if should_run result_delivery "${RUN_RESULT_DELIVERY}"; then
   prepare_module_output nf-result-delivery result_delivery_output
   DELIVERY_ARGS=()
@@ -498,21 +551,6 @@ if should_run result_delivery "${RUN_RESULT_DELIVERY}"; then
     "${DELIVERY_ARGS[@]}"
 else
   echo "[INFO] Skip nf-result-delivery"
-fi
-
-if should_run multiqc "${RUN_MULTIQC}"; then
-  prepare_module_output nf-multiqc multiqc_output
-  MULTIQC_ARGS=()
-  [[ -n "${MULTIQC_TITLE:-}" ]] && MULTIQC_ARGS+=(--multiqc_title "$MULTIQC_TITLE")
-  [[ -n "${MULTIQC_REPORT_NAME:-}" ]] && MULTIQC_ARGS+=(--multiqc_report_name "$MULTIQC_REPORT_NAME")
-  [[ -n "${MULTIQC_EXTRA_PATHS:-}" ]] && MULTIQC_ARGS+=(--multiqc_extra_paths "$MULTIQC_EXTRA_PATHS")
-  [[ -n "${MULTIQC_CONFIG:-}" ]] && MULTIQC_ARGS+=(--multiqc_config "$MULTIQC_CONFIG")
-
-  run_nf nf-multiqc \
-    --flat_output_root "${ACTIVE_RUN_ROOT}" \
-    "${MULTIQC_ARGS[@]}"
-else
-  echo "[INFO] Skip nf-multiqc"
 fi
 
 echo

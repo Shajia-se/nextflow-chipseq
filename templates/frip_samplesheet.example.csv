@@ -1,5 +1,5 @@
 sample_id,bam,peaks
-WT_GAR0968,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-chipfilter/chipfilter_output/GAR0968_S40_L006_R.nomulti.bam,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-idr/idr_output/WT_idr.sorted.chr.narrowPeak
-WT_GAR0979,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-chipfilter/chipfilter_output/GAR0979_S58_L008.nomulti.bam,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-idr/idr_output/WT_idr.sorted.chr.narrowPeak
-TG_GAR1585,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-chipfilter/chipfilter_output/GAR1585_S9_L001_R.nomulti.bam,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-idr/idr_output/TG_idr.sorted.chr.narrowPeak
-TG_GAR1586,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-chipfilter/chipfilter_output/GAR1586_S10_L001_R.nomulti.bam,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-idr/idr_output/TG_idr.sorted.chr.narrowPeak
+WT_rep1,/path/to/chipfilter_output/WT_rep1.sorted.dedup.nomulti.bam,/path/to/idr_output/WT_idr.sorted.chr.narrowPeak
+WT_rep2,/path/to/chipfilter_output/WT_rep2.sorted.dedup.nomulti.bam,/path/to/idr_output/WT_idr.sorted.chr.narrowPeak
+KO_rep1,/path/to/chipfilter_output/KO_rep1.sorted.dedup.nomulti.bam,/path/to/idr_output/KO_idr.sorted.chr.narrowPeak
+KO_rep2,/path/to/chipfilter_output/KO_rep2.sorted.dedup.nomulti.bam,/path/to/idr_output/KO_idr.sorted.chr.narrowPeak
