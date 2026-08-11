@@ -155,6 +155,8 @@ START_FROM=
 | `RESET_OUTPUTS` | Archive existing output folders before rerun | usually `false` |
 | `START_FROM` | Start from a specific module | empty for first run |
 
+If `PIPELINES_ROOT` is unset, the current launcher defaults to the parent directory of `nextflow-chipseq`. With the recommended layout, this lets the launcher find all `nf-*` modules automatically. For handoff to another user, setting `PIPELINES_ROOT=/path/to/pipelines` explicitly is still recommended.
+
 ### 4.2 Sample Table and Reference Files
 
 ```bash
@@ -197,6 +199,8 @@ CONSENSUS_PAIRS_CSV=
 
 For a first run, leave these empty. The launcher will use `samples_master.csv` to drive downstream modules where possible.
 
+If an optional sheet variable is not empty, the launcher checks that the file exists before starting. A typo in an optional sheet path fails early instead of silently falling back to auto mode.
+
 ### 4.5 Module Toggles
 
 ```bash
@@ -224,6 +228,8 @@ Guidance:
 - If there are no replicates, set `RUN_IDR=false`, `RUN_DIFFBIND=false`, and `RUN_DEEPTOOLS_HEATMAP=false`.
 - If only BAMs and MACS3 peaks are needed, keep the workflow through `RUN_MACS3=true` and disable most downstream modules.
 - For final delivery, keep `RUN_MULTIQC=true` and `RUN_RESULT_DELIVERY=true`.
+
+The current `RUN_DEEPTOOLS_HEATMAP=true` mode depends on `RUN_DIFFBIND=true`, because the heatmap uses DiffBind gain/loss BED files. Disable deepTools heatmap when DiffBind outputs are not available.
 
 ## 5. Main Sample Table: `samples_master.csv`
 
@@ -441,6 +447,18 @@ Format:
 group_name,target_bed,background_bed
 KO_unique_vs_WT_bg,/path/to/target.bed,/path/to/background.bed
 ```
+
+### 7.6 Optional File Validation
+
+If an optional sheet or optional file path is set in `pipeline.env`, for example:
+
+```bash
+MACS3_SAMPLESHEET=/path/to/macs3_samplesheet.csv
+IDR_PAIRS_CSV=/path/to/idr_pairs.csv
+MACS3_PEAK_BLACKLIST_BED=/path/to/blacklist.bed
+```
+
+the file must exist. Otherwise, the launcher stops before any Nextflow module starts.
 
 ## 8. Peak Sources
 
@@ -671,6 +689,8 @@ RUN_RESULT_DELIVERY=true
 - DiffBind requires comparable conditions and replicates.
 - Shared input/control BAMs must use the same genome build as treatment BAMs.
 - Blacklist BED must match the genome build.
+- If `RUN_DIFFBIND=false`, also set `RUN_DEEPTOOLS_HEATMAP=false`.
+- Any optional sheet or blacklist BED path you set must exist.
 
 ## 14. Common Problems
 
@@ -716,6 +736,26 @@ Check:
 - `CHIPSEEKER_PEAK_SOURCES` or `HOMER_PEAK_SOURCES` does not point to disabled upstream results.
 - `RUN_IDR`, `RUN_PEAK_CONSENSUS`, and `RUN_DIFFBIND` match the selected peak sources.
 
+### 14.6 deepTools Heatmap Fails Before Starting
+
+If you see:
+
+```text
+RUN_DEEPTOOLS_HEATMAP=true requires RUN_DIFFBIND=true
+```
+
+the configuration enables deepTools heatmap but disables DiffBind. Fix it with either:
+
+```bash
+RUN_DIFFBIND=true
+```
+
+or:
+
+```bash
+RUN_DEEPTOOLS_HEATMAP=false
+```
+
 ## 15. Delivery Recommendations
 
 At minimum, keep:
@@ -751,6 +791,7 @@ Do not treat large SAM intermediates as primary delivery files. The intended del
 - Launcher argument names must match module interfaces.
 - Archive one-off troubleshooting notes after the issue is solved.
 - Do not write "pipeline tested successfully" unless a real run was completed on the target environment.
+- Do not commit real personal run files as general deliverables, for example `pipeline.env`, project-specific env files, `.DS_Store`, or project-specific merge scripts. Use `pipeline.env.example` and generic templates for handoff.
 
 ## 17. Minimal Command Summary
 

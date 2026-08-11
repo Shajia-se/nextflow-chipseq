@@ -124,6 +124,8 @@ RESET_OUTPUTS=false
 START_FROM=
 ```
 
+如果你的目录结构是 `/path/to/pipelines/nextflow-chipseq` 和 `/path/to/pipelines/nf-*`，`PIPELINES_ROOT` 可以留空；launcher 会自动使用 `nextflow-chipseq` 的父目录。不过交付给别人时，建议显式填写，减少误会。
+
 ## 5. 第三步：填写 `samples_master.csv`
 
 可以从模板开始：
@@ -191,6 +193,8 @@ WT_rep2,,/path/to/existing_input.nomulti.bam
 
 这里 `treatment_bam` 留空表示从当前 pipeline 的 `chipfilter_output` 自动找 ChIP BAM；`control_bam` 指向已经存在的 input/control BAM。
 
+重要：只要在 `pipeline.env` 里填写了 optional sheet 路径，例如 `MACS3_SAMPLESHEET`、`IDR_PAIRS_CSV`、`FRIP_SAMPLESHEET`，该文件就必须真实存在。否则 launcher 会在开始前直接报错。
+
 ## 6. 第四步：选择是否打开可选分析
 
 默认大多数模块是打开的：
@@ -215,6 +219,8 @@ RUN_IDR=false
 RUN_DIFFBIND=false
 RUN_DEEPTOOLS_HEATMAP=false
 ```
+
+当前 `nf-deeptools-heatmap` 依赖 DiffBind 产生的 gain/loss BED 文件，所以如果 `RUN_DIFFBIND=false`，也必须设置 `RUN_DEEPTOOLS_HEATMAP=false`。
 
 如果只想跑核心 peak calling，可保留：
 
@@ -341,5 +347,6 @@ chipseeker_output/
 - boolean 值使用 `true` / `false`，不要混用 `TRUE` / `FALSE`。
 - `REFERENCE_FASTA` 对应的 BWA index 已经存在。
 - container `.sif` 路径在 HPC 上存在。
+- 如果填写了 optional sheet 或 blacklist BED，它们的路径必须存在。
 
 如果以上任何一点不确定，先做小样本测试，不要直接跑完整项目。

@@ -122,6 +122,8 @@ RESET_OUTPUTS=false
 START_FROM=
 ```
 
+If your layout is `/path/to/pipelines/nextflow-chipseq` plus `/path/to/pipelines/nf-*`, `PIPELINES_ROOT` can be left unset; the launcher defaults to the parent directory of `nextflow-chipseq`. For handoff to another user, setting it explicitly is still recommended.
+
 ## 5. Fill In `samples_master.csv`
 
 Start from the template:
@@ -189,6 +191,8 @@ WT_rep2,,/path/to/existing_input.nomulti.bam
 
 Leaving `treatment_bam` empty means the pipeline will find the treatment BAM from the current `chipfilter_output`. The `control_bam` column points to the existing input/control BAM.
 
+Important: if an optional sheet path is set in `pipeline.env`, such as `MACS3_SAMPLESHEET`, `IDR_PAIRS_CSV`, or `FRIP_SAMPLESHEET`, that file must exist. The launcher fails before starting if a user-set optional file is missing.
+
 ## 7. Choose Optional Analyses
 
 Most downstream modules are enabled by default:
@@ -213,6 +217,8 @@ RUN_IDR=false
 RUN_DIFFBIND=false
 RUN_DEEPTOOLS_HEATMAP=false
 ```
+
+The current `nf-deeptools-heatmap` workflow depends on DiffBind gain/loss BED files. If `RUN_DIFFBIND=false`, set `RUN_DEEPTOOLS_HEATMAP=false` as well.
 
 If you only need core peak calling, keep:
 
@@ -339,5 +345,6 @@ Before starting:
 - Boolean values use `true` / `false`.
 - The BWA index exists for `REFERENCE_FASTA`.
 - Singularity container paths exist on the HPC.
+- Any optional sheet or blacklist BED path you set exists.
 
 If any item is uncertain, run a small test before launching a full project.

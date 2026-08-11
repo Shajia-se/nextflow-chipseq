@@ -157,6 +157,8 @@ START_FROM=
 | `RESET_OUTPUTS` | 是否备份已有输出目录重新跑 | 通常 `false` |
 | `START_FROM` | 从某个模块开始 | 第一次留空 |
 
+如果不设置 `PIPELINES_ROOT`，当前 launcher 会默认使用 `nextflow-chipseq` 的父目录。也就是说，推荐目录结构下可以自动找到所有 `nf-*` 模块。但正式交付时仍建议显式填写 `PIPELINES_ROOT=/path/to/pipelines`。
+
 ### 4.2 样本表和参考文件
 
 ```bash
@@ -201,6 +203,8 @@ CONSENSUS_PAIRS_CSV=
 
 推荐第一次运行全部留空。pipeline 会尽量从 `samples_master.csv` 自动生成下游需要的 pairing。
 
+如果某个 optional sheet 变量不是空值，launcher 会在启动前检查该文件是否存在。路径写错会立即报错，不会静默退回自动模式。
+
 ### 4.5 模块开关
 
 ```bash
@@ -228,6 +232,8 @@ RUN_RESULT_DELIVERY=true
 - 没有 replicates：建议 `RUN_IDR=false`, `RUN_DIFFBIND=false`, `RUN_DEEPTOOLS_HEATMAP=false`。
 - 只想得到 BAM 和 MACS3 peaks：保留到 `RUN_MACS3=true`，把多数 downstream 设为 `false`。
 - 最终交付建议保留 `RUN_MULTIQC=true` 和 `RUN_RESULT_DELIVERY=true`。
+
+当前 `RUN_DEEPTOOLS_HEATMAP=true` 依赖 `RUN_DIFFBIND=true`，因为 heatmap 使用 DiffBind 输出的 gain/loss BED 文件。没有 DiffBind 结果时请关闭 deepTools heatmap。
 
 ## 5. 样本总表 `samples_master.csv`
 
@@ -438,6 +444,18 @@ HOMER_MOTIF_COMPARE_SHEET=/path/to/motif_compare_sheet.csv
 group_name,target_bed,background_bed
 KO_unique_vs_WT_bg,/path/to/target.bed,/path/to/background.bed
 ```
+
+### 7.6 Optional sheet 路径检查
+
+只要在 `pipeline.env` 里填写了 optional sheet 或 optional file 路径，例如：
+
+```bash
+MACS3_SAMPLESHEET=/path/to/macs3_samplesheet.csv
+IDR_PAIRS_CSV=/path/to/idr_pairs.csv
+MACS3_PEAK_BLACKLIST_BED=/path/to/blacklist.bed
+```
+
+这些文件就必须存在。否则 launcher 会在任何 Nextflow 模块启动前停止。
 
 ## 8. Peak sources 怎么理解
 
@@ -674,6 +692,8 @@ RUN_RESULT_DELIVERY=true
 - DiffBind 需要可比较的 conditions 和 replicates。
 - shared input/control BAM 必须和 treatment BAM 的 genome build 一致。
 - blacklist BED 的 genome build 必须和 reference 一致。
+- 如果 `RUN_DIFFBIND=false`，同时设置 `RUN_DEEPTOOLS_HEATMAP=false`。
+- 如果填写了 optional sheet 或 blacklist BED，文件必须存在。
 
 ## 14. 常见错误和解决方向
 
@@ -719,6 +739,26 @@ RUN_RESULT_DELIVERY=true
 - `CHIPSEEKER_PEAK_SOURCES` 或 `HOMER_PEAK_SOURCES` 是否选择了没有运行的上游结果。
 - `RUN_IDR`, `RUN_PEAK_CONSENSUS`, `RUN_DIFFBIND` 是否和 peak sources 匹配。
 
+### 14.6 deepTools heatmap 提前报错
+
+如果看到：
+
+```text
+RUN_DEEPTOOLS_HEATMAP=true requires RUN_DIFFBIND=true
+```
+
+说明当前配置打开了 deepTools heatmap，但关闭了 DiffBind。解决方式：
+
+```bash
+RUN_DIFFBIND=true
+```
+
+或者：
+
+```bash
+RUN_DEEPTOOLS_HEATMAP=false
+```
+
 ## 15. 交付建议
 
 交付前建议至少保存：
@@ -754,6 +794,7 @@ diffbind_output/
 - Wrapper 中传给模块的参数名必须和模块 README/main.nf 对齐。
 - 单次报错解决后，应在 issue/log 或维护记录里归档，不要把临时项目路径写成默认值。
 - 不能在未实际运行验证的情况下写“pipeline tested successfully”。
+- 不要把真实个人运行文件作为通用交付文件提交，例如 `pipeline.env`、项目特定 env、`.DS_Store`、项目特定 merge 脚本。通用交付应使用 `pipeline.env.example` 和模板文件。
 
 ## 17. 最小命令总结
 
