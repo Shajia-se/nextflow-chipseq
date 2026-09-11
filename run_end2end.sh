@@ -16,12 +16,10 @@ PROFILE="${PROFILE:-hpc}"
 HPC_MAIL_USER="${HPC_MAIL_USER:-molendo.hpc@gmail.com}"
 RESUME_FLAG=""
 [[ "${RESUME:-true}" == "true" ]] && RESUME_FLAG="-resume"
-RUN_ID="${RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
 RESET_OUTPUTS="${RESET_OUTPUTS:-false}"
 START_FROM="${START_FROM:-}"
 
 PIPELINES_ROOT="${PIPELINES_ROOT:-$(cd "${ROOT_DIR}/.." && pwd)}"
-OUTPUT_PROJECT_ROOT="${OUTPUT_PROJECT_ROOT:-${PIPELINES_ROOT}/runs/default_project}"
 RUN_FASTQC="${RUN_FASTQC:-true}"
 RUN_FASTP="${RUN_FASTP:-true}"
 RUN_BWA="${RUN_BWA:-true}"
@@ -57,8 +55,7 @@ if [[ -n "${MACS3_PEAK_BLACKLIST_BED}" ]]; then
   MACS3_BLACKLIST_ARGS=(--peak_blacklist_bed "${MACS3_PEAK_BLACKLIST_BED}")
 fi
 
-ACTIVE_RUN_ROOT="${OUTPUT_PROJECT_ROOT%/}/${RUN_ID}"
-mkdir -p "${ACTIVE_RUN_ROOT}"
+source "${ROOT_DIR}/scripts/run_common.sh"
 
 FASTQC_OUT="${ACTIVE_RUN_ROOT}/fastqc_output"
 FASTP_OUT="${ACTIVE_RUN_ROOT}/fastp_output"
@@ -117,22 +114,10 @@ should_run () {
   [[ "$m_idx" -ge "$s_idx" ]]
 }
 
-run_nf () {
-  local module="$1"
-  shift
-  local module_dir="${PIPELINES_ROOT}/${module}"
-  echo
-  echo "========== ${module} =========="
-  echo "cd ${module_dir}"
-  need_dir "$module_dir"
-  cd "$module_dir"
-  echo "nextflow run main.nf -profile ${PROFILE} --project_folder ${ACTIVE_RUN_ROOT} --mail_user ${HPC_MAIL_USER} $* ${RESUME_FLAG}"
-  nextflow run main.nf -profile "${PROFILE}" --project_folder "${ACTIVE_RUN_ROOT}" --mail_user "${HPC_MAIL_USER}" "$@" ${RESUME_FLAG}
-}
 
 need_file () {
   local f="$1"
-  [[ -f "$f" ]] || { echo "ERROR: missing file: $f"; exit 1; }
+  [[ "$f" == /* && -f "$f" ]] || { echo "ERROR: require an existing absolute file path: $f"; exit 1; }
 }
 
 need_dir () {
@@ -143,7 +128,7 @@ need_dir () {
 need_optional_file () {
   local label="$1"
   local f="$2"
-  [[ -z "$f" ]] || [[ -f "$f" ]] || { echo "ERROR: ${label} was set but file does not exist: $f"; exit 1; }
+  [[ -z "$f" ]] || [[ "$f" == /* && -f "$f" ]] || { echo "ERROR: ${label} was set but file does not exist: $f"; exit 1; }
 }
 
 prepare_module_output () {
@@ -169,7 +154,7 @@ echo "[INFO] Using env file: ${ENV_FILE}"
 echo "[INFO] Profile: ${PROFILE}"
 echo "[INFO] HPC mail user: ${HPC_MAIL_USER}"
 echo "[INFO] Pipelines root: ${PIPELINES_ROOT}"
-echo "[INFO] Output project root: ${OUTPUT_PROJECT_ROOT}"
+echo "[INFO] Chip runs root: ${CHIP_RUNS_ROOT}"
 echo "[INFO] Active run root: ${ACTIVE_RUN_ROOT}"
 [[ -n "${START_FROM}" ]] && echo "[INFO] START_FROM: ${START_FROM}"
 
@@ -198,15 +183,22 @@ need_optional_file "FRIP_SAMPLESHEET" "${FRIP_SAMPLESHEET:-}"
 need_optional_file "HOMER_MOTIF_COMPARE_SHEET" "${HOMER_MOTIF_COMPARE_SHEET:-}"
 need_optional_file "CONSENSUS_PAIRS_CSV" "${CONSENSUS_PAIRS_CSV:-}"
 need_optional_file "MACS3_PEAK_BLACKLIST_BED" "${MACS3_PEAK_BLACKLIST_BED:-}"
+need_optional_file "NEXTFLOW_CONFIG" "${NEXTFLOW_CONFIG:-}"
 need_optional_file "MULTIQC_CONFIG" "${MULTIQC_CONFIG:-}"
 need_optional_file "SHARED_CONTROL_MANIFEST" "${SHARED_CONTROL_MANIFEST:-}"
+
+python3 "$LAYOUT_HELPER" snapshot --record "$RECORD_DIR" "$SAMPLES_MASTER" \
+  "${MACS3_SAMPLESHEET:-}" "${SHARED_CONTROL_MANIFEST:-}" "${IDR_PAIRS_CSV:-}" \
+  "${DIFFBIND_SAMPLESHEET:-}" "${FRIP_SAMPLESHEET:-}" "${CONSENSUS_PAIRS_CSV:-}" \
+  "${HOMER_MOTIF_COMPARE_SHEET:-}" "${MULTIQC_CONFIG:-}" "${NEXTFLOW_CONFIG:-}"
+
 
 FRIP_SOURCES_DEFAULT=()
 [[ "${RUN_IDR}" == "true" ]] && FRIP_SOURCES_DEFAULT+=("idr")
 if [[ "${RUN_PEAK_CONSENSUS}" == "true" ]]; then
   FRIP_SOURCES_DEFAULT+=("consensus_q0.01" "consensus_q0.05")
 fi
-FRIP_PEAK_SOURCES="${FRIP_PEAK_SOURCES:-$(join_by_comma "${FRIP_SOURCES_DEFAULT[@]}")}"
+FRIP_PEAK_SOURCES="${FRIP_PEAK_SOURCES:-$(join_by_comma ${FRIP_SOURCES_DEFAULT[@]+"${FRIP_SOURCES_DEFAULT[@]}"})}"
 
 CHIPSEEKER_SOURCES_DEFAULT=()
 [[ "${RUN_IDR}" == "true" ]] && CHIPSEEKER_SOURCES_DEFAULT+=("idr")
@@ -214,20 +206,20 @@ if [[ "${RUN_PEAK_CONSENSUS}" == "true" ]]; then
   CHIPSEEKER_SOURCES_DEFAULT+=("consensus_q0.01" "consensus_q0.05")
 fi
 [[ "${RUN_DIFFBIND}" == "true" ]] && CHIPSEEKER_SOURCES_DEFAULT+=("diffbind")
-CHIPSEEKER_PEAK_SOURCES="${CHIPSEEKER_PEAK_SOURCES:-$(join_by_comma "${CHIPSEEKER_SOURCES_DEFAULT[@]}")}"
+CHIPSEEKER_PEAK_SOURCES="${CHIPSEEKER_PEAK_SOURCES:-$(join_by_comma ${CHIPSEEKER_SOURCES_DEFAULT[@]+"${CHIPSEEKER_SOURCES_DEFAULT[@]}"})}"
 
 HOMER_SOURCES_DEFAULT=()
 [[ "${RUN_IDR}" == "true" ]] && HOMER_SOURCES_DEFAULT+=("idr")
 if [[ "${RUN_PEAK_CONSENSUS}" == "true" ]]; then
   HOMER_SOURCES_DEFAULT+=("consensus_q0.01" "consensus_q0.05")
 fi
-HOMER_PEAK_SOURCES="${HOMER_PEAK_SOURCES:-$(join_by_comma "${HOMER_SOURCES_DEFAULT[@]}")}"
+HOMER_PEAK_SOURCES="${HOMER_PEAK_SOURCES:-$(join_by_comma ${HOMER_SOURCES_DEFAULT[@]+"${HOMER_SOURCES_DEFAULT[@]}"})}"
 
 # 1) FastQC
 if should_run fastqc "${RUN_FASTQC}"; then
   prepare_module_output nf-fastqc fastqc_output
   run_nf nf-fastqc \
-    "${MASTER_ARGS[@]}"
+    ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"}
 else
   echo "[INFO] Skip nf-fastqc"
 fi
@@ -236,7 +228,7 @@ fi
 if should_run fastp "${RUN_FASTP}"; then
   prepare_module_output nf-fastp fastp_output
   run_nf nf-fastp \
-    "${MASTER_ARGS[@]}"
+    ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"}
 else
   echo "[INFO] Skip nf-fastp"
 fi
@@ -245,7 +237,7 @@ fi
 if should_run bwa "${RUN_BWA}"; then
   prepare_module_output nf-bwa bwa_output
   run_nf nf-bwa \
-    "${MASTER_ARGS[@]}" \
+    ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
     --bwa_raw_data "${FASTP_OUT}" \
     --reference_fasta "$REFERENCE_FASTA"
 else
@@ -256,7 +248,7 @@ fi
 if should_run picard "${RUN_PICARD}"; then
   prepare_module_output nf-picard picard_output
   run_nf nf-picard \
-    "${MASTER_ARGS[@]}" \
+    ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
     --bwa_output "${BWA_OUT}"
 else
   echo "[INFO] Skip nf-picard"
@@ -266,7 +258,7 @@ fi
 if should_run chipfilter "${RUN_CHIPFILTER}"; then
   prepare_module_output nf-chipfilter chipfilter_output
   run_nf nf-chipfilter \
-    "${MASTER_ARGS[@]}" \
+    ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
     --chipfilter_raw_bam "${PICARD_OUT}" \
     --mapq_threshold "${MAPQ_THRESHOLD}"
 else
@@ -281,7 +273,7 @@ if should_run macs3 "${RUN_MACS3}"; then
   prepare_module_output nf-macs3 macs3_output
   if [[ -n "${MACS3_SAMPLESHEET:-}" && -f "${MACS3_SAMPLESHEET}" ]]; then
     run_nf nf-macs3 \
-      "${MASTER_ARGS[@]}" \
+      ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
       --chipfilter_output "${CHIPFILTER_OUT}" \
       --macs3_samplesheet "$MACS3_SAMPLESHEET" \
       --idr_qvalue "${MACS3_QVALUE_IDR}" \
@@ -290,10 +282,10 @@ if should_run macs3 "${RUN_MACS3}"; then
       --run_idr_branch "${MACS3_RUN_IDR_BRANCH}" \
       --run_consensus_branch "${MACS3_RUN_CONSENSUS_BRANCH}" \
       --run_strict_branch "${MACS3_RUN_STRICT_BRANCH}" \
-      "${MACS3_BLACKLIST_ARGS[@]}"
+      ${MACS3_BLACKLIST_ARGS[@]+"${MACS3_BLACKLIST_ARGS[@]}"}
   else
     run_nf nf-macs3 \
-      "${MASTER_ARGS[@]}" \
+      ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
       --chipfilter_output "${CHIPFILTER_OUT}" \
       --idr_qvalue "${MACS3_QVALUE_IDR}" \
       --consensus_qvalue "${MACS3_QVALUE_CONSENSUS}" \
@@ -301,7 +293,7 @@ if should_run macs3 "${RUN_MACS3}"; then
       --run_idr_branch "${MACS3_RUN_IDR_BRANCH}" \
       --run_consensus_branch "${MACS3_RUN_CONSENSUS_BRANCH}" \
       --run_strict_branch "${MACS3_RUN_STRICT_BRANCH}" \
-      "${MACS3_BLACKLIST_ARGS[@]}"
+      ${MACS3_BLACKLIST_ARGS[@]+"${MACS3_BLACKLIST_ARGS[@]}"}
   fi
 else
   echo "[INFO] Skip nf-macs3"
@@ -312,12 +304,12 @@ if should_run idr "${RUN_IDR}"; then
   prepare_module_output nf-idr idr_output
   if [[ -n "${IDR_PAIRS_CSV:-}" && -f "${IDR_PAIRS_CSV}" ]]; then
     run_nf nf-idr \
-      "${MASTER_ARGS[@]}" \
+      ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
       --macs3_output "${MACS3_OUT}" \
       --idr_pairs_csv "$IDR_PAIRS_CSV"
   else
     run_nf nf-idr \
-      "${MASTER_ARGS[@]}" \
+      ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
       --macs3_output "${MACS3_OUT}"
   fi
 else
@@ -332,7 +324,7 @@ if should_run peak_consensus "${RUN_PEAK_CONSENSUS}"; then
       --consensus_pairs_csv "$CONSENSUS_PAIRS_CSV"
   else
     run_nf nf-peak-consensus \
-      "${MASTER_ARGS[@]}" \
+      ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
       --macs3_output "${MACS3_OUT}"
   fi
 else
@@ -344,11 +336,11 @@ if should_run frip "${RUN_FRIP}" && [[ -n "${FRIP_PEAK_SOURCES}" ]]; then
   prepare_module_output nf-frip frip_output
   if [[ -n "${FRIP_SAMPLESHEET:-}" && -f "${FRIP_SAMPLESHEET}" ]]; then
     run_nf nf-frip \
-      "${MASTER_ARGS[@]}" \
+      ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
       --frip_samplesheet "$FRIP_SAMPLESHEET"
   else
     run_nf nf-frip \
-      "${MASTER_ARGS[@]}" \
+      ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
       --chipfilter_output "${CHIPFILTER_OUT}" \
       --idr_output "${IDR_OUT}" \
       --peak_consensus_output "${PEAK_CONSENSUS_OUT}" \
@@ -362,7 +354,7 @@ fi
 if should_run bamcoverage "${RUN_BAMCOVERAGE}"; then
   prepare_module_output nf-bamcoverage bamcoverage_output
   run_nf nf-bamcoverage \
-    "${MASTER_ARGS[@]}" \
+    ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
     --bam_input_dir "${CHIPFILTER_OUT}" \
     --bam_pattern "${CHIPFILTER_OUT}/*.nomulti.bam"
 else
@@ -377,7 +369,7 @@ if should_run diffbind "${RUN_DIFFBIND}"; then
       --samplesheet "$DIFFBIND_SAMPLESHEET"
 else
     run_nf nf-diffbind \
-      "${MASTER_ARGS[@]}" \
+      ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
       --chipfilter_output "${CHIPFILTER_OUT}" \
       --macs3_output "${MACS3_OUT}"
   fi
@@ -414,7 +406,7 @@ if should_run homer "${RUN_HOMER}"; then
     prepare_module_output nf-homer homer_output
     if [[ -n "${HOMER_MOTIF_COMPARE_SHEET:-}" && -f "${HOMER_MOTIF_COMPARE_SHEET}" ]]; then
       run_nf nf-homer \
-        "${MASTER_ARGS[@]}" \
+        ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
         --idr_output "${IDR_OUT}" \
         --peak_consensus_output "${PEAK_CONSENSUS_OUT}" \
         --diffbind_output "${DIFFBIND_OUT}" \
@@ -424,7 +416,7 @@ if should_run homer "${RUN_HOMER}"; then
         --motif_compare_sheet "$HOMER_MOTIF_COMPARE_SHEET"
     else
       run_nf nf-homer \
-        "${MASTER_ARGS[@]}" \
+        ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
         --idr_output "${IDR_OUT}" \
         --peak_consensus_output "${PEAK_CONSENSUS_OUT}" \
         --diffbind_output "${DIFFBIND_OUT}" \
@@ -441,7 +433,7 @@ fi
 if should_run deeptools "${RUN_DEEPTOOLS_HEATMAP}"; then
   prepare_module_output nf-deeptools-heatmap deeptools_heatmap_output
   run_nf nf-deeptools-heatmap \
-    "${MASTER_ARGS[@]}" \
+    ${MASTER_ARGS[@]+"${MASTER_ARGS[@]}"} \
     --chipfilter_output "${CHIPFILTER_OUT}" \
     --macs3_output "${MACS3_OUT}" \
     --diffbind_output "${DIFFBIND_OUT}"
@@ -460,7 +452,7 @@ if should_run multiqc "${RUN_MULTIQC}"; then
 
   run_nf nf-multiqc \
     --flat_output_root "${ACTIVE_RUN_ROOT}" \
-    "${MULTIQC_ARGS[@]}"
+    ${MULTIQC_ARGS[@]+"${MULTIQC_ARGS[@]}"}
 else
   echo "[INFO] Skip nf-multiqc"
 fi
@@ -492,7 +484,7 @@ if should_run result_delivery "${RUN_RESULT_DELIVERY}"; then
     --idr_qvalue "${MACS3_QVALUE_IDR}" \
     --consensus_qvalue "${MACS3_QVALUE_CONSENSUS}" \
     --strict_qvalue "${MACS3_QVALUE_STRICT}" \
-    "${DELIVERY_ARGS[@]}"
+    ${DELIVERY_ARGS[@]+"${DELIVERY_ARGS[@]}"}
 else
   echo "[INFO] Skip nf-result-delivery"
 fi

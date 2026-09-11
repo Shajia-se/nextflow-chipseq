@@ -206,3 +206,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Never commit run data or local launch caches
+chip_runs/
+work/
+.nextflow/
+.nextflow.log*
+*.trace.tsv
