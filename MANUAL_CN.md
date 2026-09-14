@@ -2,7 +2,7 @@
 
 ## 适用范围与固定设置
 
-当前标准版对应 Marjolein 这类小鼠双端样品：使用已处理的 liver Input 25L007941，每个样品独立跑 MACS3 q=0.05 和 q=0.01，不合并重复。[quick-start.md](quick-start.md) 提供完整命令和三张表的示例。其他物种、组织、CUT&RUN 或宽峰分析需要重新确认实验与参数适配性。
+当前标准版对应 MH 这类小鼠双端样品：使用已处理的 liver Input 25L007941，每个样品独立跑 MACS3 q=0.05 和 q=0.01，不合并重复。[quick-start.md](quick-start.md) 提供完整命令和三张表的示例。其他物种、组织、CUT&RUN 或宽峰分析需要重新确认实验与参数适配性。
 
 - 参考：GRCm39 / GENCODE vM27。
 - FASTA：`/ictstr01/groups/idc/projects/uhlenhaut/jiang/reference/bwa/GRCm39_vM27/GRCm39.primary_assembly.genome.fa`。
@@ -17,8 +17,8 @@
 
 ```bash
 cd /ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nextflow-chipseq
-python3 scripts/new_run.py 20260914_marjolein
-cd ../chip_runs/20260914_marjolein
+python3 scripts/new_run.py 20260914_MH
+cd ../chip_runs/20260914_MH
 ```
 
 每次使用新日期/运行人名称。新建脚本拒绝覆盖已有目录，生成 env、三张 CSV、挂载配置和提交脚本。不要创建额外 RUNNER 层级，也不要生成后随意搬动目录，因为配置与 submit.sh 保存了绝对路径。
@@ -63,7 +63,7 @@ Ctrl+C 只退出日志查看。默认 submit.sh 调用 parallel-safe launcher，
 ```text
 chip_runs/
   shared_input/liver/25L007941/  # 可复用 Input，不能随 run 清理
-  20260914_marjolein/
+  20260914_MH/
     pipeline.env 与三张 CSV
     external_input.config、submit.sh
     launcher.JOB_ID.log

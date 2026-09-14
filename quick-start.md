@@ -6,8 +6,8 @@ Mouse paired-end samples, shared liver Input **25L007941**, independent MACS3 ca
 
 ```bash
 cd /ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nextflow-chipseq
-python3 scripts/new_run.py 20260914_marjolein
-cd ../chip_runs/20260914_marjolein
+python3 scripts/new_run.py 20260914_MH
+cd ../chip_runs/20260914_MH
 ```
 
 Replace the run name with a new date/person name. Do not move the generated folder: paths in the env and submit script are absolute.

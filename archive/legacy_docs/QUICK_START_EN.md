@@ -32,7 +32,7 @@ Resume with the same RUN_ID, code, inputs and RESUME=true. New inputs/settings r
 
 ## Standard and advanced configuration
 
-`pipeline.env.example` is a self-contained HPC configuration for the Marjolein-style mouse paired-end workflow. It runs QC, alignment, filtering, independent MACS3 calls at q=0.05 and q=0.01, bigWig, MultiQC and delivery. It does not merge samples or run IDR, consensus, DiffBind, FRiP, annotation or motifs. The reference is GRCm39 / GENCODE vM27; shared liver Input 25L007941 is fixed. This preset is only appropriate when that reference, control and narrow-peak analysis match the experiment.
+`pipeline.env.example` is a self-contained HPC configuration for the MH-style mouse paired-end workflow. It runs QC, alignment, filtering, independent MACS3 calls at q=0.05 and q=0.01, bigWig, MultiQC and delivery. It does not merge samples or run IDR, consensus, DiffBind, FRiP, annotation or motifs. The reference is GRCm39 / GENCODE vM27; shared liver Input 25L007941 is fixed. This preset is only appropriate when that reference, control and narrow-peak analysis match the experiment.
 
 `new_run.py` creates the env, three CSV templates, Input mount config and submission script. Replace example samples in all three CSVs, keeping sample IDs consistent. The master contains only new ChIP FASTQs; the MACS3 sheet selects the existing control BAM, and the manifest supplies the control QC root. Their paths are fixed in the generated files, not inferred from comments in the env. Shared Input data must be available at the configured HPC path.
 

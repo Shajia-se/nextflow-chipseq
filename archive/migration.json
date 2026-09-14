@@ -1,10 +1,10 @@
 {
   "pipeline.advanced.env": "archive/configs/pipeline.advanced.env",
   "pipeline.advanced.env.example": "archive/configs/pipeline.advanced.env.example",
-  "pipeline_marjolein_pooled.env": "archive/configs/pipeline_marjolein_pooled.env",
+  "pipeline_MH_pooled.env": "archive/configs/pipeline_MH_pooled.env",
   "ENCODE_standard.md": "archive/reference/ENCODE_standard.md",
   "templates": "archive/templates",
-  "scripts/merge_marjolein_pool_fastq.sh": "archive/scripts/merge_marjolein_pool_fastq.sh",
+  "scripts/merge_MH_pool_fastq.sh": "archive/scripts/merge_MH_pool_fastq.sh",
   "scripts/downsample_fastq_pairs.py": "archive/scripts/downsample_fastq_pairs.py",
   "docs/presentation": "archive/presentation",
   "docs/archive": "archive/legacy_docs"
