@@ -1,3 +1,5 @@
+> Retired walkthrough; use [current technical manual](../../../docs/USER_MANUAL_EN.md).
+
 # Nextflow ChIP-seq Walkthrough 04: Picard
 
 ### Module: `nf-picard`
@@ -74,9 +76,3 @@ Focus on:
 - Use Picard metrics as trend and outlier detectors, not isolated pass/fail gates.
 
 ---
-
-## Suggested Talking Point: Why dedup in Picard if chipfilter comes next?
-
-- `nf-chipfilter` focuses on MAPQ filtering plus mitochondrial burden QC.
-- Duplicate handling is conceptually separate and is best done explicitly here.
-- Keeping `remove_duplicates` configurable preserves flexibility for low-depth or special library scenarios.

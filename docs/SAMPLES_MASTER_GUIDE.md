@@ -1,3 +1,5 @@
+> For the current fixed shared-Input workflow, follow [quick-start.md](../quick-start.md). The detailed guide below also covers advanced workflows. The standard preset requires editing all three CSV files; they are not synchronized automatically.
+
 # How To Fill `samples_master.csv`
 
 This guide explains exactly how to fill `samples_master.csv` for the end-to-end ChIP-seq pipeline.

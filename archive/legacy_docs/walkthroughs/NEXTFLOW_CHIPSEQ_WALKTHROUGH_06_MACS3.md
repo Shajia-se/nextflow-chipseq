@@ -1,6 +1,7 @@
+> Retired walkthrough; use [current technical manual](../../../docs/USER_MANUAL_EN.md).
+
 # Nextflow ChIP-seq Walkthrough 06: MACS3
 
-## Slide Content (1 slide)
 
 ### Module: `nf-macs3`
 
@@ -36,18 +37,6 @@
 **Branch mapping**
 - `idr_q0.1` -> `nf-idr`
 - `strict_q0.01` -> `nf-peak-consensus`, `nf-diffbind`
-
----
-
-## Oral Presentation (~90 sec)
-
-This module performs peak calling with MACS3 using treatment-control pairs.
-Compared with the earlier version, we now always generate two output branches: one relaxed branch at q<0.1 for IDR, and one strict branch at q<0.01 for consensus and differential workflows.
-
-A recent update is that we now also perform peak-level blacklist filtering after callpeak.
-So both branches are cleaned against mm39 blacklist regions, and each sample writes a `blacklist_applied` report with before/after peak counts.
-
-This setup keeps branch intent clear: IDR gets a broader candidate set, while strict analyses use higher-confidence peaks.
 
 ---
 

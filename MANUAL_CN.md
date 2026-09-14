@@ -1,53 +1,95 @@
-# ChIP-seq 交接操作手册
+# 用户手册 — 标准 ChIP-seq 流程
 
-先按 [快速开始](QUICK_START_CN.md) 生成本次 run。代码由各 nf-* 仓库维护，分析数据归属 chip_runs/日期_运行人，不需要定期去各代码仓库寻找 work。
+## 适用范围与固定设置
 
-## 文件职责
+当前标准版对应 Marjolein 这类小鼠双端样品：使用已处理的 liver Input 25L007941，每个样品独立跑 MACS3 q=0.05 和 q=0.01，不合并重复。[quick-start.md](quick-start.md) 提供完整命令和三张表的示例。其他物种、组织、CUT&RUN 或宽峰分析需要重新确认实验与参数适配性。
 
-| 文件/目录 | 内容 | 保留方式 |
-|---|---|---|
-| pipeline.env | 本次路径、参考、模块开关 | 随结果保存 |
-| samples_master.csv | 样品、FASTQ、Input 配对、重复 | 随结果保存 |
-| submit.sh | Slurm launcher；日志绝对路径在 run 内 | 随结果保存 |
-| *_output/ | 各模块发布结果 | 验收/归档 |
-| 02_run_record/<attempt>/ | 每次启动的 env、样本表、版本/代码差异、命令、日志、状态 | 随结果保存 |
-| 99_intermediate/ | work、execution 缓存、临时文件、run-local BWA 索引 | 验收后可整体删除 |
+- 参考：GRCm39 / GENCODE vM27。
+- FASTA：`/ictstr01/groups/idc/projects/uhlenhaut/jiang/reference/bwa/GRCm39_vM27/GRCm39.primary_assembly.genome.fa`。
+- GTF：`/ictstr01/groups/idc/projects/uhlenhaut/jiang/reference/gtf/gencode.vM27.primary_assembly.annotation.gtf`。
+- Input 根目录：`/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/chip_runs/shared_input/liver/25L007941`。
+- Input BAM：上述目录中的 `chipfilter_output/25L007941.nomulti.bam`。
+- MAPQ：24；MACS3 两个阈值同时开启。
 
-各模块在 99_intermediate/execution/nf-* 中启动，main.nf 和默认 config 从原代码目录读取；work 明确写到 99_intermediate/work/nf-*。BWA 索引不会写回参考目录：发现完整匹配的既有索引时在 run 内链接，否则在 run 内构建。清理该目录不会删除外部索引目标。
+开启 FastQC、fastp、BWA、Picard、chipfilter、MACS3、bamCoverage、MultiQC 和交付汇总。关闭 IDR、peak consensus、DiffBind、FRiP、ChIPseeker、HOMER 和 heatmap。bigWig 是 ChIP coverage，不是减去 Input 后的轨道。
 
-## 参数
+## 1. 创建本次运行
 
-- PIPELINES_ROOT：包含 nextflow-chipseq 和全部 nf-* 仓库的父目录。
-- CHIP_RUNS_ROOT：默认 PIPELINES_ROOT/chip_runs；可指定其他磁盘上名字为 chip_runs 的目录，不能指向代码仓库内部。
-- RUN_ID：如 20260911_shan。省略时自动使用时间戳和 RUNNER/用户名；恢复时须使用原 ID，因此推荐总是显式填写。
-- SAMPLES_MASTER：绝对路径；字段参见 [样本表说明](docs/SAMPLES_MASTER_GUIDE.md)。
-- REFERENCE_FASTA/GTF：绝对路径；即使只跑部分模块，当前 launcher 仍要求提供这两个文件。
-- NEXTFLOW_CONFIG：可选绝对路径的 Nextflow 配置，用于本地镜像/资源或站点设置。路径管理和保留 work 由 launcher 强制设置。
-- RESUME=true：恢复同次运行。START_FROM 可选择模块起点，但此前所需输出必须存在。
-- RESET_OUTPUTS=false：保留已有输出。true 会把对应输出目录重命名为带时间戳的备份，会增加空间占用。
+```bash
+cd /ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nextflow-chipseq
+python3 scripts/new_run.py 20260914_marjolein
+cd ../chip_runs/20260914_marjolein
+```
 
-OUTPUT_PROJECT_ROOT 已退休。旧 env 含 runs/default_project、runs_output 等路径会明确报错；请生成新 env，不要直接在旧缓存目录间搬动文件后声称能 resume。
+每次使用新日期/运行人名称。新建脚本拒绝覆盖已有目录，生成 env、三张 CSV、挂载配置和提交脚本。不要创建额外 RUNNER 层级，也不要生成后随意搬动目录，因为配置与 submit.sh 保存了绝对路径。
 
-## 运行状态与失败
+## 2. 填写文件
 
-每次启动产生新的记录目录，失败不会覆盖此前启动的日志。run.json 的 COMPLETED 表示该次启用的模块已通过；未启用模块没有被验证。查看 logs/nf-*.console.log 和 logs/nf-*/status.json。运行期间 .launcher.lock 阻止相同 RUN_ID 再次启动；不同 RUN_ID 各有独立 work 和缓存。机器异常中断留下锁时，确认 launcher 及计算作业都停止后才人工移除锁。
+| 文件 | 本次需要填写的内容 |
+|---|---|
+| pipeline.env | 邮箱、运行人；保留生成的 RUN_ID、路径和标准模块开关 |
+| samples_master.csv | 新 ChIP 样品编号、真实条件、FASTQ R1/R2 绝对路径 |
+| macs3_samplesheet.csv | 同样的样品编号；treatment_bam 留空，control_bam 保留固定 Input |
+| shared_control_manifest.csv | 同样的样品编号；保留 control_id=25L007941 和 Input 根目录 |
+| external_input.config | 保留共享 Input 根目录挂载，供容器读取 BAM 与 QC |
+| submit.sh | 检查分区和 qos；保留生成的运行目录和启动命令 |
 
-修复失败原因后用同一个 env 再提交。改变 FASTQ、样本定义、参考或分析阈值时用新 RUN_ID，避免模块自身的已有文件跳过逻辑复用旧结果。
+三张表都必须删除全部示例行，并填入相同的真实 sample_id。脚本不会在你修改 master 后自动同步另两张表，当前也没有保证三张表一致的交叉验证。
 
-## 分析边界
+master 只填本次的新 ChIP FASTQ，不要加入已经处理的 shared Input。没有生物学重复时，各样品 replicate=1，condition 填真实实验条件，is_control=false、control_id 留空、use_for_idr=false、use_for_diffbind=false、enabled=true。名称与路径避免空格、逗号和 shell 特殊字符；第三个样品也必须正确区分 R1/R2。完整可复制表格见快速开始。
 
-普通 Input FASTQ 和 ChIP 一起处理时，MACS3_SAMPLESHEET 留空，由 master 自动配对。复用外部 Input BAM 时提供显式 MACS3 样本表，并核对容器挂载；SHARED_CONTROL_MANIFEST 用于结果记录，不能代替 MACS3 配对。
+MACS3 表决定实际用哪个 BAM；manifest 供交付汇总读取 Input 身份与旧 QC，不代替 MACS3 表。env 中的 Input 注释仅用于说明，真正生效的是 CSV 路径与挂载配置。control_root 应包含 fastp_output、bwa_output、picard_output 和 chipfilter_output，不是 BAM 文件本身。
 
-保留默认 MACS3 q-value 0.1/0.05/0.01；下游部分 profile 名字仍固定。Consensus 自动模式要求每条件恰好两个 ChIP 重复；IDR 自动模式只选前两个。Pooled 样本不能当生物学重复。DiffBind 需要合适的条件/重复设计，当前 heatmap 依赖其输出。
+## 3. 提交和监控
 
-更换物种时除了 FASTA/GTF，还要核对 MACS3/IDR genome size、bamCoverage effectiveGenomeSize 和 HOMER genome。chipfilter 当前做 MAPQ 过滤并统计线粒体比例，不等于实际删除线粒体或 BAM blacklist 区域。
+确认批处理环境可用 Nextflow、Java、Python 3.8+ 和 Singularity。参考、Input 及容器必须可访问。
 
-## 结果交接与清理
+```bash
+sbatch submit.sh
+squeue -u "$USER"
+```
 
-1. 确认最新启动完成，启用模块的结果完整。
-2. 保存各 *_output/ 和 02_run_record/ 到最终位置，并确认复制完整。
-3. 删除本次 run 下整个 99_intermediate/。不需要进入里面逐个判断 BAM；删除后缓存恢复能力丢失。
+下面 JOB_ID 替换为 sbatch 返回的数字：
 
-不要改成把正式结果软链接到 work，否则清理会破坏结果。各 *_output/ 内的 trimmed FASTQ 和多个阶段 BAM 仍会占空间；它们不随中间目录删除。原始数据、软件安装、Java/Nextflow 框架和 Docker 镜像库单独管理。
+```bash
+tail -f launcher.JOB_ID.log
+sacct -j JOB_ID --format=JobID,JobName,State,ExitCode,Elapsed
+```
 
-[验证范围与测试](tests/README.md)。目录重构验证不能替代正式样品的生物学 QC。
+Ctrl+C 只退出日志查看。默认 submit.sh 调用 parallel-safe launcher，各模块提交自己的 Slurm 作业，因此队列中多个 job 是正常现象。模块详情在 `02_run_record/本次启动/logs/`，例如 nf-bwa.console.log。提交成功不等于运行成功；主日志应以 `[STATUS] COMPLETED` 结束，还要检查实际结果和 QC。
+
+## 4. 结果与目录
+
+```text
+chip_runs/
+  shared_input/liver/25L007941/  # 可复用 Input，不能随 run 清理
+  20260914_marjolein/
+    pipeline.env 与三张 CSV
+    external_input.config、submit.sh
+    launcher.JOB_ID.log
+    *_output/
+    02_run_record/              # 每次启动的配置、版本、日志、命令、状态
+    99_intermediate/            # work、执行目录和缓存、临时文件、BWA 索引
+```
+
+- q=0.05 peaks：`macs3_output/consensus_q0.05/`。
+- q=0.01 peaks：`macs3_output/strict_q0.01/`。
+- bigWig：`bamcoverage_output/`。
+- 综合 QC：`multiqc_output/`。
+- 交付汇总：`result_delivery_output/`。
+
+consensus_q0.05 只是 MACS3 分支目录名，不表示进行了重复间 consensus。lean 交付包主要是汇总，不包含所有需要保存的 peaks、轨道等模块结果。检查三个样品是否齐全、比对率、重复率、两档 peaks 与轨道；留意汇总表中的 NA。关闭的分析不在成功验证范围内。
+
+## 5. 失败恢复与清理
+
+失败后定位首个出错模块，修正原因；输入与代码不变时保留 RUN_ID、RESUME=true、RESET_OUTPUTS=false，重新 sbatch。保留 99_intermediate，不要同时启动同一个 run。机器异常留下锁时，必须确认 controller 和计算任务均已停止才能移除锁。
+
+更换 FASTQ、参考、样品定义或 peak 阈值时用新 RUN_ID。某些模块会直接跳过已经存在的结果，单独关闭 resume 不能保证重新计算。平时 START_FROM 留空，不开启 RESET_OUTPUTS。
+
+完成后检查并备份模块结果及 02_run_record，再删除本次 run 的 99_intermediate；删除后无法利用原缓存恢复。结果目录中已发布的 trimmed FASTQ 与各阶段 BAM 不会随之消失，仍占空间。不要删除原始数据、参考、共享 Input 或正在运行任务的数据。Nextflow 软件缓存和 Docker 镜像另行管理。
+
+## 高级设置和验证范围
+
+旧本地配置保存在 archive/configs/pipeline.advanced.env，完整可复用模板为 archive/configs/pipeline.advanced.env.example；默认启用全部模块，需要按实验设计检查。标准版 env 自包含，不再依赖隐藏默认开关。本地 Docker 运行还需要本地参考、Input 和容器配置，不能直接使用 HPC 路径。
+
+当前标准配置和生成文件已进行本地检查；此前的合成数据测试不代表所有新版配置已在 HPC 跑完。真实验收以该 run 的日志和产物为准，测试范围见 [tests/README.md](tests/README.md)。docs 中旧教程仅作开发参考，日常操作以本手册和 quick-start.md 为准。

@@ -1,3 +1,5 @@
+> Retired walkthrough; use [current technical manual](../../../docs/USER_MANUAL_EN.md).
+
 # Nextflow ChIP-seq Walkthrough 03: BWA Mapping
 
 ### Module: `nf-bwa`

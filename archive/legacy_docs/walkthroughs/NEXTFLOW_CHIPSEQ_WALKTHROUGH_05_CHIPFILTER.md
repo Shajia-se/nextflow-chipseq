@@ -1,3 +1,5 @@
+> Retired walkthrough; use [current technical manual](../../../docs/USER_MANUAL_EN.md).
+
 # Nextflow ChIP-seq Walkthrough 05: ChipFilter
 
 ### Module: `nf-chipfilter`
@@ -28,10 +30,6 @@
 
 **Decision impact for downstream**
 - Directly affects FRiP, MACS3 peak counts, and signal-to-noise in tracks/heatmaps
-
----
-
-## Oral Presentation (speaker-friendly, ~90 sec)
 
 ---
 

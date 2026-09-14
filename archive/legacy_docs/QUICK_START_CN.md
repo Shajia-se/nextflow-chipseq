@@ -1,3 +1,5 @@
+> Archived, superseded instructions. Use [current quick start](../../quick-start.md).
+
 # 新样品快速开始
 
 每次运行全部放在 `chip_runs/日期_运行人/`，不用再建立 project_A/runs_output 等层级。
@@ -19,7 +21,7 @@ python3 scripts/new_run.py 20260911_shan
 
 参考文件和样本表使用绝对路径；不要在 CSV 路径或名字里使用逗号、空格或 shell 特殊字符。设置了可选样本表路径就必须提供真实存在的文件。外部 shared Input BAM 场景仍需要显式 MACS3 样本表和对应挂载。
 
-上游首次验证启用 FASTQC、FASTP、BWA、PICARD、CHIPFILTER、MULTIQC，关闭其他 RUN_* 开关。正式下游根据真实 Input/重复设计启用；模板默认启用完整分析，请不要未经检查直接提交。
+上游首次验证启用 FASTQC、FASTP、BWA、PICARD、CHIPFILTER、MULTIQC，关闭其他 RUN_* 开关。正式下游根据真实 Input/重复设计启用；简化模板固定运行上游、MACS3、bigWig、MultiQC 和交付；完整模块开关见 pipeline.advanced.env.example。
 
 ## 3. 运行
 

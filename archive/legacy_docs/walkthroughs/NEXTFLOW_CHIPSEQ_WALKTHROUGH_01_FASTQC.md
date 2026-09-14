@@ -1,3 +1,5 @@
+> Retired walkthrough; use [current technical manual](../../../docs/USER_MANUAL_EN.md).
+
 # Nextflow ChIP-seq Walkthrough 01: FastQC
 
 ### Module: `nf-fastqc`

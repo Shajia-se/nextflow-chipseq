@@ -1,0 +1,2 @@
+// Shared liver Input: expose both BAM and upstream QC outputs.
+params.extra_mounts = '--bind /ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/chip_runs/shared_input/liver/25L007941'
