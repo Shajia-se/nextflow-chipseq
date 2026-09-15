@@ -1,0 +1,5 @@
+sample_id,treatment_bam,control_bam
+WT_rep1,,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/chip_runs/shared_input/liver/25L007941/chipfilter_output/25L007941.nomulti.bam
+WT_rep2,,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/chip_runs/shared_input/liver/25L007941/chipfilter_output/25L007941.nomulti.bam
+KO_rep1,,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/chip_runs/shared_input/liver/25L007941/chipfilter_output/25L007941.nomulti.bam
+KO_rep2,,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/chip_runs/shared_input/liver/25L007941/chipfilter_output/25L007941.nomulti.bam
